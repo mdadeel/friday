@@ -1,0 +1,54 @@
+/* Design tokens. Mirrors docs/edith/EDITH_FRONTEND_DESIGN_SYSTEM.md (CSS variables, no Tailwind). */
+:root {
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Bengali", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-scale: 1;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent);
+  --transition: 160ms ease;
+
+  /* dark theme (default) */
+  --bg: #0d1117;
+  --bg-raised: #151b24;
+  --bg-sunk: #0a0e14;
+  --border: #263041;
+  --text: #e6edf3;
+  --text-muted: #9aa7b8;
+  --text-faint: #6d7a8c;
+  --warn-text: #f0b44c;
+  --ok: #3fb985;
+  --warn: #e7a33e;
+  --error: #ef6461;
+  --info: #5aa8f0;
+  --sim: #b48cf2;
+
+  --accent: #37c2d6;
+  --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+  --accent-text: #061114;
+}
+
+:root[data-theme='light'] {
+  --bg: #f6f7f9;
+  --bg-raised: #ffffff;
+  --bg-sunk: #eceff3;
+  --border: #d5dbe3;
+  --text: #15191f;
+  --text-muted: #4c5868;
+  --text-faint: #6d7a8c;
+  --warn-text: #8a5300;
+  --ok: #17784b;
+  --warn: #9a5f00;
+  --error: #b42323;
+  --info: #1b5fb0;
+  --sim: #6b3fbf;
+}
+
+:root[data-accent='blue'] { --accent: #4c8dff; --accent-text: #ffffff; }
+:root[data-accent='neutral'] { --accent: #aeb8c6; --accent-text: #0d1117; }
+:root[data-accent='cyan'] { --accent: #37c2d6; }
+
+:root[data-density='compact'] { --space-3: 8px; --space-4: 12px; --space-5: 16px; }
+
+:root[data-motion='reduced'] * { transition: none !important; animation: none !important; }
