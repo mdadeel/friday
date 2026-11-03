@@ -10,35 +10,35 @@ import {
   ChatContainerRoot,
   ChatContainerContent,
   ChatContainerScrollAnchor,
-} from '@/components/prompt-kit/chat-container';
-import { ScrollButton } from '@/components/prompt-kit/scroll-button';
+} from '@/components/ui/chat-container';
+import { ScrollButton } from '@/components/ui/scroll-button';
 import {
   Message,
   MessageAvatar,
   MessageContent,
   MessageActions,
   MessageAction,
-} from '@/components/prompt-kit/message';
-import { Markdown } from '@/components/prompt-kit/markdown';
+} from '@/components/ui/message';
+import { Markdown } from '@/components/ui/markdown';
 import {
   ChainOfThought,
   ChainOfThoughtStep,
   ChainOfThoughtTrigger,
   ChainOfThoughtContent,
   ChainOfThoughtItem,
-} from '@/components/prompt-kit/chain-of-thought';
-import { ThinkingBar } from '@/components/prompt-kit/thinking-bar';
-import { Tool, type ToolPart } from '@/components/prompt-kit/tool';
-import { Source, SourceTrigger, SourceContent } from '@/components/prompt-kit/source';
+} from '@/components/ui/chain-of-thought';
+import { ThinkingBar } from '@/components/ui/thinking-bar';
+import { Tool, type ToolPart } from '@/components/ui/tool';
+import { Source, SourceTrigger, SourceContent } from '@/components/ui/source';
 import {
   PromptInput,
   PromptInputTextarea,
   PromptInputActions,
   PromptInputAction,
-} from '@/components/prompt-kit/prompt-input';
-import { PromptSuggestion } from '@/components/prompt-kit/prompt-suggestion';
-import { FeedbackBar } from '@/components/prompt-kit/feedback-bar';
-import { Loader } from '@/components/prompt-kit/loader';
+} from '@/components/ui/prompt-input';
+import { PromptSuggestion } from '@/components/ui/prompt-suggestion';
+import { FeedbackBar } from '@/components/ui/feedback-bar';
+import { Loader } from '@/components/ui/loader';
 
 import {
   Mic,
