@@ -1,7 +1,7 @@
 import { Store } from '../store';
 import type { ConversationService, DiagnosticsService, MemoryService, RoutingService, SendOptions, TaskService } from '../contracts';
 import type { ChatMessage, TaskIntent } from '../../types/contracts';
-import { buildRoute, classifyIntent, DISPLAY_TZ, evaluateExpression, formatInDisplayTz, tier0Match } from './logic';
+import { buildRoute, classifyIntent, DISPLAY_TZ, evaluateExpression, formatInDisplayTz, orchestrationOf, planFor, tier0Match } from './logic';
 import { nextId, nowIso } from './ids';
 
 const welcome = (): ChatMessage => ({
@@ -52,7 +52,6 @@ export function createConversationService(deps: {
 
   const handleTier0 = (text: string, source: 'text' | 'voice'): void => {
     const hit = tier0Match(text);
-    const started = performance.now();
     const now = new Date();
     let answer: string;
     if (hit?.intent === 'time') {
@@ -66,10 +65,9 @@ export function createConversationService(deps: {
         answer = `I could not evaluate that: ${(e as Error).message}.`;
       }
     }
-    const latency = Math.max(1, Math.round(performance.now() - started));
-    const route = buildRoute(nextId('rt'), nowIso(), hit?.intent ?? 'chat', latency);
+    const route = buildRoute(nextId('rt'), nowIso(), hit?.intent ?? 'chat');
     deps.routing.record(route);
-    deps.diag.log('router', 'debug', `T0 ${hit?.intent} answered locally (${latency} ms)`, route.id);
+    deps.diag.log('router', 'debug', `T0 ${hit?.intent} answered in the browser`, route.id);
     streamReply(answer, route, source);
   };
 
@@ -91,7 +89,7 @@ export function createConversationService(deps: {
 
     if (intent === 'personal') {
       const r = deps.memory.whoAmI();
-      const route = buildRoute(nextId('rt'), nowIso(), 'personal', 1400);
+      const route = buildRoute(nextId('rt'), nowIso(), 'personal');
       deps.routing.record(route);
       const cite = r.usedIds.length ? ` [memory: ${r.usedIds.join(', ')}]` : '';
       streamReply(r.text + cite, route, source);
@@ -99,12 +97,13 @@ export function createConversationService(deps: {
     }
 
     if (intent === 'research' || intent === 'code' || intent === 'continue') {
-      const route = buildRoute(nextId('rt'), nowIso(), intent, 0);
+      const route = buildRoute(nextId('rt'), nowIso(), intent);
       deps.routing.record(route);
       const taskId = deps.tasks.start(text, intent, source, route);
       append({ id: nextId('msg'), role: 'edith', kind: 'task', text: '', at: nowIso(), source, taskId, simulated: true });
+      const orch = orchestrationOf(intent, planFor(intent));
       streamReply(
-        `Started a simulated task. Route: ${route.tier} · ${route.model ?? 'no model'}. The plan, tools, approvals and verification are in the Activity panel. Nothing external is touched.`,
+        `Started a simulated task. Route: ${route.tier} · ${route.model ?? 'no model'}, decision only, no model called. Orchestration: ${orch.pattern}, ${orch.steps} steps, up to ${orch.maxParallel} in parallel, ${orch.approvalGates} approval gate(s). The plan and evidence are in the Activity panel. Nothing external is touched.`,
         route,
         source,
         followUp,
@@ -112,7 +111,7 @@ export function createConversationService(deps: {
       return;
     }
 
-    const route = buildRoute(nextId('rt'), nowIso(), 'chat', 0);
+    const route = buildRoute(nextId('rt'), nowIso(), 'chat');
     deps.routing.record(route);
     streamReply(
       'No model is connected in this prototype, so there is no real answer to give. The real system would send this to the Tier 2 route shown below. Time, arithmetic, memory questions and task plans do run here.',

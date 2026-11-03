@@ -7,7 +7,7 @@ import { SimBadge } from './SimBadge';
 import { Dialog } from './Dialog';
 import { tierTone } from '../app/presentation';
 
-/** Route footer for every EDITH answer: tier, model, data class, locality, latency. Click opens detail. */
+/** Route footer for every EDITH answer: tier, route, data class, locality, and whether anything ran. Click opens detail. */
 export function RouteFooter({ route }: { route: RouteInfo }) {
   const [open, setOpen] = useState(false);
   return (
@@ -19,7 +19,7 @@ export function RouteFooter({ route }: { route: RouteInfo }) {
         </Chip>
         <Chip>{route.dataClass}</Chip>
         <Chip>{route.locality === 'Local' ? en.route.local : en.route.cloud}</Chip>
-        <Chip>{route.latencyMs} ms</Chip>
+        <Chip>{route.executedBy === 'browser' ? en.route.ranInBrowser : en.route.noModelCalled}</Chip>
         <SimBadge compact />
       </div>
       {open ? (
@@ -45,8 +45,10 @@ export function RouteFooter({ route }: { route: RouteInfo }) {
             <dd>{route.fallbacks.length ? route.fallbacks.join(' → ') : en.route.none}</dd>
             <dt>Outcome</dt>
             <dd>{route.outcome}</dd>
+            <dt>Executed by</dt>
+            <dd>{route.executedBy === 'browser' ? en.route.ranInBrowser : en.route.noModelCalled}</dd>
           </dl>
-          <p className="small faint">Simulated route decision. Nothing was sent to a model.</p>
+          <p className="small faint">Simulated route decision. Nothing was sent to a model or provider.</p>
         </Dialog>
       ) : null}
     </>

@@ -4,9 +4,8 @@ import { useServices } from '../app/services';
 import { HEALTH_LABEL, healthTone, fmtDateTime } from '../app/presentation';
 import { StatusDot } from './StatusDot';
 import { Badge } from './Badge';
-import { Toggle } from './Toggle';
 
-/** Provider health with a simulated probe, and local models with load state. Probes never touch the network. */
+/** Provider status and the published model catalogue. A probe never touches the network; loading is not available here. */
 export function RoutingProviders({ providers, models }: { providers: ProviderInfo[]; models: LocalModel[] }) {
   const { routing } = useServices();
   return (
@@ -28,6 +27,7 @@ export function RoutingProviders({ providers, models }: { providers: ProviderInf
                 <button type="button" className="btn btn-small" disabled={p.health === 'probing'} onClick={() => routing.probe(p.id)}>
                   {en.routing.probe}
                 </button>
+                {p.reason ? <span className="small faint">{p.reason}</span> : null}
               </div>
             </li>
           ))}
@@ -39,19 +39,22 @@ export function RoutingProviders({ providers, models }: { providers: ProviderInf
           {models.map((m) => (
             <li key={m.id} className="row between wrap gap">
               <div className="stack gap-tight">
-                <span>{m.name}</span>
+                <span className="mono">{m.name}</span>
                 <span className="small faint">
-                  {m.sizeGB} GB · {m.quant} · {m.contextTokens.toLocaleString('en-GB')} ctx · tools: {m.toolCalling}
+                  {m.sizeLabel} · {m.context} context · {m.capabilities.join(', ')}
                 </span>
               </div>
               <div className="row gap">
-                <Badge tone={m.loaded ? 'ok' : 'muted'}>{m.loaded ? en.routing.loaded : en.routing.notLoaded}</Badge>
-                <Toggle label={`Load ${m.name}`} checked={m.loaded} onChange={(v) => routing.setModelLoaded(m.id, v)} />
+                <Badge tone="muted">{en.routing.notChecked}</Badge>
+                <button type="button" className="btn btn-small" disabled title={en.routing.loadDisabled}>
+                  Load
+                </button>
               </div>
             </li>
           ))}
         </ul>
-        <p className="small faint">Model sizes and names are candidates until gate G1 closes. Load state is simulated.</p>
+        <p className="small faint">{en.routing.catalogueNote}</p>
+        <p className="small faint">{en.routing.loadDisabled}</p>
       </section>
     </div>
   );

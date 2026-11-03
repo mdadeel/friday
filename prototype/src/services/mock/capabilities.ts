@@ -3,32 +3,32 @@ import type { CapabilityService, CapabilityState, DiagnosticsService } from '../
 import type { CapabilityKind, McpServer } from '../../types/contracts';
 import { seedMcpServers, seedSkills } from '../../data/seed';
 
+const NOT_STARTED = 'Not started: this prototype cannot launch MCP servers or contact their endpoints.';
+
+/**
+ * Capability state is a record of intent, not a running process. Enabling a server never reports it as ready:
+ * the prototype has no MCP client, so the honest state is 'unavailable' with the reason.
+ */
 export function createCapabilityService(diag: DiagnosticsService): CapabilityService {
   const store = new Store<CapabilityState>({ servers: seedMcpServers, skills: seedSkills });
-  const timers: ReturnType<typeof setTimeout>[] = [];
 
   const updateServer = (id: string, fn: (s: McpServer) => McpServer): void => {
     store.set((s) => ({ ...s, servers: s.servers.map((x) => (x.id === id ? fn(x) : x)) }));
   };
 
   const setServerEnabled = (id: string, enabled: boolean): void => {
-    updateServer(id, (s) => ({ ...s, enabled, state: enabled ? 'starting' : 'stopped', reason: undefined }));
-    diag.log('mcp', 'info', `${id} ${enabled ? 'enabled — starting (simulated, nothing launched)' : 'disabled'}`);
-    if (enabled) {
-      timers.push(
-        setTimeout(() => {
-          // web-docs needs an auth secret that is not configured, so it stays unavailable.
-          if (id === 'web-docs') updateServer(id, (s) => ({ ...s, state: 'unavailable', reason: 'Authentication not configured (simulated).' }));
-          else updateServer(id, (s) => ({ ...s, state: 'ready' }));
-        }, 1100),
-      );
-    }
+    updateServer(id, (s) => ({
+      ...s,
+      enabled,
+      state: enabled ? 'unavailable' : 'stopped',
+      reason: enabled ? NOT_STARTED : 'Stopped. Nothing was running.',
+    }));
+    diag.log('mcp', 'info', `${id} ${enabled ? 'enable requested: not started (no MCP client)' : 'disabled'}`);
   };
 
   const restart = (id: string): void => {
-    updateServer(id, (s) => ({ ...s, state: 'starting' }));
-    timers.push(setTimeout(() => updateServer(id, (s) => ({ ...s, state: id === 'web-docs' ? 'unavailable' : 'ready' })), 1100));
-    diag.log('mcp', 'info', `${id} restart requested (simulated)`);
+    updateServer(id, (s) => ({ ...s, state: 'unavailable', reason: NOT_STARTED }));
+    diag.log('mcp', 'info', `${id} restart requested: not started (no MCP client)`);
   };
 
   const setToolEnabled = (serverId: string, toolName: string, enabled: boolean): void => {
@@ -41,7 +41,7 @@ export function createCapabilityService(diag: DiagnosticsService): CapabilitySer
 
   const approveSkillChange = (id: string): void => {
     store.set((s) => ({ ...s, skills: s.skills.map((k) => (k.id === id ? { ...k, hashStatus: 'approved' as const } : k)) }));
-    diag.log('skills', 'info', `${id} new content hash approved (simulated)`);
+    diag.log('skills', 'info', `${id} content change marked approved (session only; no hash was computed)`);
   };
 
   const kindOf = (capability: string): CapabilityKind => {

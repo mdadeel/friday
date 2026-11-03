@@ -15,8 +15,8 @@ export function createDiagnosticsService(): DiagnosticsService {
   const exportPreview = (): string =>
     JSON.stringify(
       {
-        note: 'Prototype export preview. Simulated entries only; nothing is written or sent.',
-        removed: ['absolute file paths (replaced with project-relative paths)', 'secret references (none present)', 'raw audio (never recorded)', 'raw prompt and response bodies'],
+        note: 'Prototype preview. Nothing is redacted, written or sent. The list below is the intended rule set, not an implemented one.',
+        intendedRemovals: ['absolute file paths (to be replaced with project-relative paths)', 'secret references', 'raw audio', 'raw prompt and response bodies'],
         entries: store.get().slice(-50).map(({ at, level, subsystem, message, traceId }) => ({ at, level, subsystem, message, traceId })),
       },
       null,

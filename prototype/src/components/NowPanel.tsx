@@ -1,6 +1,6 @@
 import { en } from '../i18n/en';
 import { useObservable, useServices } from '../app/services';
-import { isActive, stateLabel, stateTone, voiceTone, fmtDuration } from '../app/presentation';
+import { isActive, stateLabel, stateTone, voiceTone } from '../app/presentation';
 import { StatusDot } from './StatusDot';
 import { Meter } from './Meter';
 import { Badge } from './Badge';
@@ -81,7 +81,7 @@ export function NowPanel() {
             <Badge tone="accent">{last.tier}</Badge>
             <Chip>{last.model ?? en.route.noModel}</Chip>
             <Chip>{last.locality === 'Local' ? en.route.local : en.route.cloud}</Chip>
-            <Chip>{fmtDuration(last.latencyMs)}</Chip>
+            <Chip>{last.executedBy === 'browser' ? en.route.ranInBrowser : en.route.noModelCalled}</Chip>
           </div>
         </section>
       ) : null}

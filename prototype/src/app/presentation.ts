@@ -44,6 +44,7 @@ export const HEALTH_LABEL: Record<ProviderHealth, string> = {
   down: 'Down',
   not_configured: 'Not configured',
   probing: 'Probing',
+  unknown: 'Unknown (not probed)',
 };
 
 export function tierTone(tier: Tier): BadgeTone {

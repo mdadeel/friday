@@ -71,8 +71,8 @@ Checked against `docs/edith/EDITH_UI_UX_SPECIFICATION.md` (§3, §4, §5, §7, �
 | 4.1 General: presets (Focused, Builder, Researcher, Quiet) | Not done | Preset control is not in the schema yet |
 | 4.2–4.14 settings panels | Partial | Each section has its panel or fields. Several controls are display-only and are labelled as such |
 | 4.5 Memory review queue, side-by-side contradictions | Done | Review tab in Memory |
-| 4.6 MCP tool list, history of last 20 calls | Done | `McpServerCard` |
-| 4.7 Routing summary, table, fallback timeline, filters | Done | |
+| 4.6 MCP tool list, history of last 20 calls | Done | `McpServerCard`. Servers are sample configurations and stay stopped; history is empty because nothing is called |
+| 4.7 Routing summary, table, fallback timeline, filters | Done | Counts cover this session only. No latency, success-rate or 24-hour figures: they were never measured. Model calls are 0 by construction |
 | 4.9 Search: authority tiers add/remove, test query | Done | `SearchPanel` |
 | 4.10 Policy matrix with locked cells | Done | Locked cells show a lock and the reason |
 | 4.12 System: socket path with copy | Done | Shows `$XDG_RUNTIME_DIR/edith/api.sock` (0600) |
@@ -117,3 +117,26 @@ Headless Chromium, 1440×900, all routes. Covered: conversation hero, a simulate
 
 - Phase 12a and 12b headings in `docs/edith/EDITH_IMPLEMENTATION_ROADMAP.md` are still open.
 - Desktop overlay (Tauri/Rust) cannot be built or verified in this sandbox because crates.io is blocked. It is documented, not built.
+
+## Accuracy revision (2026-11-03)
+
+This revision removed invented content and made the screens describe only what the prototype does.
+
+| Area | Before | Now | Status |
+|------|--------|-----|--------|
+| Provider health | Ollama `up`, llama.cpp `down`, fixed probe times | `unknown` with the reason "not probed"; the browser has no provider client. Built-in utilities are `up` because they run in the browser | Done |
+| Models | `loaded` toggles, invented sizes, "candidate" tags, 32K context on all | Published qwen3 catalogue from the Ollama page (sizes, context, tags). Status "not checked". Load is disabled with the reason | Done. Read as "load available models": loading needs a provider client, which this prototype lacks |
+| Routing figures | 128 requests, 31% no-model share, 740 ms median, 24-hour fallbacks, success rates | Session counts only: routes, browser-answered, model calls (0), fallbacks. Success and latency show "Not measured" | Done |
+| Route latency | Per-route milliseconds | Replaced by "Ran in browser" or "No model called" | Done |
+| Orchestration | Not shown | `direct`, `deterministic` or `dag`, computed from the plan. Shows steps, widest level (max parallel) and approval gates in the task card, Activity and the chat reply | Done |
+| Capabilities | Enabling showed "Ready" after a timer; invented history | Enabling shows "Unavailable: not started"; history starts empty; servers are labelled sample configurations | Done |
+| Activity / audit / logs | Seeded events, a "Health OK" log, "connection refused", timeouts of 8 s | Empty at start; session start notes say what is not connected | Done |
+| Evidence and sources | `spans` counts, invented dates | Only the verified fixed list with check dates; claims written from the page (see `SOURCES.md`) | Done |
+| Overlay mode table | Always-on-top ratings presented as facts | Labelled as design targets, not verified | Done |
+| Settings: search, system | "Robots.txt is always respected", socket "active" wording | Labelled as design intent; socket marked "designed, not observed" | Done |
+| Model catalogue | Not present | `src/data/modelCatalog.ts`, with the source and check date on every row | Done |
+| Orchestration on DAG tasks | Parallel width fixed by the scheduler (max 3) | Width derived from the dependency graph; test covers research = 3 | Done |
+| Real model, search or MCP calls | None | None (unchanged). Probes never contact a host | Not applicable |
+| Install/load models locally | Not possible | Not in the prototype; needs a provider client and the user's machine | Not done (manual step for the user) |
+| Live preview check | Preview pages return "Preview Unavailable" to the fetch tool | Not checked from this environment | Not checked |
+

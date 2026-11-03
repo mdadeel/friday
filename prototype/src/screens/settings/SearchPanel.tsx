@@ -68,7 +68,7 @@ export function SearchPanel() {
           ))}
         </ul>
       ) : null}
-      <p className="small faint">Results come from a fixed simulated bank. No web request is made. Robots.txt is always respected in the real system.</p>
+      <p className="small faint">Results come from a fixed, hand-checked list (simulated). No web request is made. Respecting robots.txt is a design intent; it is not implemented in this prototype.</p>
     </div>
   );
 }

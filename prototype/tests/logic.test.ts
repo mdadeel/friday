@@ -65,3 +65,29 @@ test('display timezone formatting uses Asia/Dhaka', () => {
   // 2026-11-03T00:00:00Z is 06:00 in Asia/Dhaka (UTC+6).
   assert.equal(formatInDisplayTz(new Date('2026-11-03T00:00:00Z'), 'time'), '06:00');
 });
+
+test('orchestration is derived from the plan: direct, deterministic or dag', async () => {
+  const { orchestrationOf } = await import('../src/services/mock/logic.ts');
+  const det = orchestrationOf('time', planFor('time'));
+  assert.equal(det.pattern, 'deterministic');
+  assert.equal(det.steps, 1);
+  const chat = orchestrationOf('chat', planFor('chat'));
+  assert.equal(chat.pattern, 'direct');
+  assert.equal(chat.maxParallel, 1);
+  const research = orchestrationOf('research', planFor('research'));
+  assert.equal(research.pattern, 'dag');
+  assert.equal(research.steps, 8);
+  // Steps 1 and 2 have no dependencies and run together; the widest level is 3 (steps 0, 1, 2).
+  assert.equal(research.maxParallel, 3);
+  const code = orchestrationOf('code', planFor('code'));
+  assert.equal(code.approvalGates, 1);
+});
+
+test('model routes are decisions only: nothing executes in the browser unless Tier 0', async () => {
+  const { buildRoute } = await import('../src/services/mock/logic.ts');
+  assert.equal(buildRoute('a', '', 'time').executedBy, 'browser');
+  const r = buildRoute('b', '', 'chat');
+  assert.equal(r.executedBy, 'none');
+  assert.equal(r.model, 'qwen3:8b');
+  assert.equal(buildRoute('c', '', 'research').model, 'qwen3:32b');
+});

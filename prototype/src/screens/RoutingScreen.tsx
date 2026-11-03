@@ -1,6 +1,5 @@
 import { en } from '../i18n/en';
 import { useObservable, useServices } from '../app/services';
-import { pct } from '../app/presentation';
 import { StatTile } from '../components/StatTile';
 import { RoutingTiers } from '../components/RoutingTiers';
 import { RoutingProviders } from '../components/RoutingProviders';
@@ -16,9 +15,9 @@ export function RoutingScreen() {
   const r = useObservable(routing);
   const categoryColumns: Column<CategoryStat & { id: string }>[] = [
     { key: 'c', header: 'Task category', render: (c) => c.category },
-    { key: 'r', header: 'Selected route', render: (c) => c.route },
-    { key: 's', header: 'Success rate', align: 'right', render: (c) => pct(c.successRate) },
-    { key: 'm', header: 'Median latency', align: 'right', render: (c) => `${c.medianMs} ms` },
+    { key: 'r', header: 'Route used', render: (c) => c.route || en.routing.noRouteYet },
+    { key: 'n', header: en.routing.callsThisSession, align: 'right', render: (c) => String(c.calls) },
+    { key: 's', header: 'Success rate', align: 'right', render: () => en.routing.notMeasured },
   ];
   const categoryRows = r.categories.map((c) => ({ ...c, id: c.category }));
 
@@ -30,10 +29,10 @@ export function RoutingScreen() {
         <span className="small faint">All figures on this screen are simulated.</span>
       </div>
       <div className="stat-grid">
-        <StatTile label={en.routing.requests} value={String(r.requests24h)} note="prototype session" />
-        <StatTile label={en.routing.noModel} value={pct(r.noModelShare)} note="Tier 0/1 share" />
-        <StatTile label={en.routing.latency} value={`${r.medianFirstTokenMs} ms`} />
-        <StatTile label={en.routing.fallbacks} value={String(r.fallbacks24h)} />
+        <StatTile label={en.routing.requests} value={String(r.sessionRequests)} note="this session" />
+        <StatTile label={en.routing.browserAnswered} value={String(r.browserAnswered)} note="no model called" />
+        <StatTile label={en.routing.modelCalls} value={String(r.modelCalls)} note={en.routing.modelCallsNote} />
+        <StatTile label={en.routing.fallbacks} value={String(r.fallbacks)} note="this session" />
       </div>
       <section className="panel" aria-labelledby="tiers-h">
         <h2 id="tiers-h">{en.routing.tiers}</h2>

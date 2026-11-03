@@ -88,28 +88,28 @@ export function OverlayScreen() {
                 <tr>
                   <th scope="col">Mode</th>
                   <th scope="col">Used when</th>
-                  <th scope="col">Always-on-top</th>
+                  <th scope="col">Always-on-top (design target, unverified)</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td>A — layer surface</td>
                   <td>A supported compositor protocol is available</td>
-                  <td>Strong</td>
+                  <td>Target: strong. Not verified on any compositor.</td>
                 </tr>
                 <tr>
                   <td>B — XWayland window</td>
                   <td>Running under XWayland or X11</td>
-                  <td>Good (window manager dependent)</td>
+                  <td>Target: window-manager dependent. Not verified.</td>
                 </tr>
                 <tr>
                   <td>C — normal window</td>
                   <td>Fallback</td>
-                  <td>None. Keep-on-top is a best-effort hint.</td>
+                  <td>Target: best-effort hint only. Not verified.</td>
                 </tr>
               </tbody>
             </table>
-            <p className="small faint">The browser preview cannot detect the platform mode. The desktop build is not in this prototype (see docs/edith, desktop overlay).</p>
+            <p className="small faint">The browser preview cannot detect the platform mode. The desktop build is not in this prototype and was not run on any platform. Upstream evidence on Wayland always-on-top is mixed (see prototype/SOURCES.md, tao issue #1134).</p>
           </section>
         </div>
       </div>

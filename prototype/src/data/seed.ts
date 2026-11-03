@@ -1,4 +1,6 @@
-// Demo data. Every record is SIMULATED. Nothing here reflects a real device, model, server or memory.
+// Sample data for the prototype. Every record is SIMULATED and labelled as a sample.
+// Nothing here is a real device, model, server, memory, approval or log entry. Counts and history
+// that depend on activity start empty and fill only from what happens in this browser session.
 import type {
   AuditEntry,
   CategoryStat,
@@ -14,9 +16,11 @@ import type {
   TierConfig,
   TrustGrant,
 } from '../types/contracts';
+import { CATALOG_MODELS } from './modelCatalog';
+import { DEFAULT_TIER_MODELS } from '../services/mock/logic';
 
-const DAY = 24 * 60 * 60 * 1000;
 const MIN = 60 * 1000;
+const DAY = 24 * 60 * MIN;
 export const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
 const mem = (over: Partial<MemoryItem> & Pick<MemoryItem, 'id' | 'category' | 'content' | 'provenance' | 'status'>): MemoryItem => ({
@@ -50,53 +54,36 @@ export function seedMemory(): MemoryItem[] {
   ];
 }
 
+/** Provider state. Nothing is probed in the prototype, so every provider starts as unknown or not configured. */
 export const seedProviders: ProviderInfo[] = [
-  { id: 'native', name: 'Native Rust utilities', kind: 'native', endpoint: 'in-process', health: 'up', lastProbe: ago(10_000), consent: ['Public', 'Personal', 'Project'], models: [], simulated: true },
-  { id: 'ollama', name: 'Ollama (local server)', kind: 'local_server', endpoint: 'http://127.0.0.1:11434 (example)', health: 'up', lastProbe: ago(20_000), consent: ['Public', 'Personal', 'Project'], models: ['qwen3 · 1.7B (candidate)', 'qwen3 · 8B (candidate)', 'qwen3 · 32B (candidate)'], simulated: true },
-  { id: 'llama_cpp', name: 'llama.cpp server (local)', kind: 'local_server', endpoint: 'http://127.0.0.1:8080 (example)', health: 'down', lastProbe: ago(90_000), consent: ['Public', 'Personal', 'Project'], models: ['qwen3-8b.gguf (candidate)'], simulated: true },
-  { id: 'cloud_llm', name: 'Cloud model provider', kind: 'cloud', endpoint: 'not configured', health: 'not_configured', lastProbe: ago(0), consent: [], models: [], simulated: true },
-  { id: 'gemini_live', name: 'Gemini Live (speech, cloud)', kind: 'speech', endpoint: 'not configured — consent required', health: 'not_configured', lastProbe: ago(0), consent: [], models: [], simulated: true },
-  { id: 'searxng', name: 'SearXNG (self-hosted search)', kind: 'search', endpoint: 'http://127.0.0.1:8888 (example)', health: 'degraded', lastProbe: ago(60_000), consent: ['Public'], models: [], simulated: true },
+  { id: 'native', name: 'Built-in utilities (browser)', kind: 'native', endpoint: 'runs in this browser tab', health: 'up', reason: 'Clock and calculator run in the browser (Tier 0).', consent: ['Public', 'Personal', 'Project'], models: [], simulated: true },
+  { id: 'ollama', name: 'Ollama (local server)', kind: 'local_server', endpoint: 'http://127.0.0.1:11434 (Ollama default port)', health: 'unknown', reason: 'Not probed. This prototype has no provider client and does not contact any server.', consent: ['Public', 'Personal', 'Project'], models: CATALOG_MODELS.map((m) => m.name), simulated: true },
+  { id: 'llama_cpp', name: 'llama.cpp server (local)', kind: 'local_server', endpoint: 'not configured', health: 'not_configured', reason: 'No endpoint is set.', consent: [], models: [], simulated: true },
+  { id: 'cloud_llm', name: 'Cloud model provider', kind: 'cloud', endpoint: 'not configured', health: 'not_configured', reason: 'Off by default. Needs consent per provider.', consent: [], models: [], simulated: true },
+  { id: 'searxng', name: 'SearXNG (search)', kind: 'search', endpoint: 'not configured', health: 'not_configured', reason: 'No endpoint is set. Search results in this prototype come from a fixed list.', consent: ['Public'], models: [], simulated: true },
+  { id: 'gemini_live', name: 'Gemini Live (speech, cloud)', kind: 'speech', endpoint: 'not configured — consent required', health: 'not_configured', reason: 'Cloud speech needs consent. Not configured.', consent: [], models: [], simulated: true },
 ];
 
-export const seedModels: LocalModel[] = [
-  { id: 'm-q17', provider: 'ollama', name: 'qwen3 · 1.7B', sizeGB: 1.1, quant: 'Q4_K_M', contextTokens: 32768, toolCalling: 'unknown', loaded: false, simulated: true },
-  { id: 'm-q8', provider: 'ollama', name: 'qwen3 · 8B', sizeGB: 5.2, quant: 'Q4_K_M', contextTokens: 32768, toolCalling: 'declared', loaded: true, simulated: true },
-  { id: 'm-q32', provider: 'ollama', name: 'qwen3 · 32B', sizeGB: 20.0, quant: 'Q4_K_M', contextTokens: 32768, toolCalling: 'declared', loaded: false, simulated: true },
-  { id: 'm-llcpp', provider: 'llama_cpp', name: 'qwen3-8b.gguf', sizeGB: 5.2, quant: 'Q5_K_M', contextTokens: 16384, toolCalling: 'unknown', loaded: false, simulated: true },
-];
+export const seedModels: LocalModel[] = CATALOG_MODELS;
 
+/** Tier table starts from the default tags. Every tier is a candidate until the benchmark gate closes. */
 export const seedTiers: TierConfig[] = [
-  { tier: 'T0', label: 'Deterministic', provider: 'native', model: '—', fallbacks: [] },
-  { tier: 'T1', label: 'Light', provider: 'ollama', model: 'qwen3 · 1.7B (candidate)', fallbacks: ['rules'] },
-  { tier: 'T2', label: 'General', provider: 'ollama', model: 'qwen3 · 8B (candidate)', fallbacks: ['llama_cpp'] },
-  { tier: 'T3', label: 'Advanced', provider: 'ollama', model: 'qwen3 · 32B (candidate)', fallbacks: ['llama_cpp', 'T2'] },
-  { tier: 'T4', label: 'Specialist', provider: 'searxng', model: 'speech: whisper.cpp (planned)', fallbacks: ['direct fetch'] },
+  { tier: 'T0', label: 'Deterministic', provider: 'native', model: '', fallbacks: [] },
+  { tier: 'T1', label: 'Light', provider: 'ollama', model: DEFAULT_TIER_MODELS.T1, fallbacks: ['rules'] },
+  { tier: 'T2', label: 'General', provider: 'ollama', model: DEFAULT_TIER_MODELS.T2, fallbacks: ['llama_cpp'] },
+  { tier: 'T3', label: 'Advanced', provider: 'ollama', model: DEFAULT_TIER_MODELS.T3, fallbacks: ['llama_cpp', 'T2'] },
 ];
 
-export const seedCategories: CategoryStat[] = [
-  { category: 'Deterministic (time, calc)', route: 'T0 · native', successRate: 1, medianMs: 3 },
-  { category: 'Conversation', route: 'T2 · qwen3 8B', successRate: 0.97, medianMs: 1900 },
-  { category: 'Personal memory', route: 'T2 · qwen3 8B', successRate: 0.94, medianMs: 1500 },
-  { category: 'Research', route: 'T3 · qwen3 32B → T2', successRate: 0.82, medianMs: 48000 },
-  { category: 'Coding', route: 'T3 · qwen3 32B → T2', successRate: 0.78, medianMs: 62000 },
-  { category: 'Continuation', route: 'T2 · qwen3 8B', successRate: 0.9, medianMs: 2600 },
-];
+/** Categories are the route table itself. Call counts are filled in from this session's routes. */
+export const seedCategories: CategoryStat[] = ['Deterministic', 'Conversation', 'Personal memory', 'Research', 'Coding', 'Continuation'].map((c) => ({
+  category: c,
+  route: '',
+  calls: 0,
+}));
 
-export const seedRoutingEvents: RoutingEvent[] = [
-  { id: 'ev-1', at: ago(3_600_000), severity: 'warn', kind: 'degraded', text: 'llama.cpp server unreachable; T3 fallback chain skipped it (simulated).' },
-  { id: 'ev-2', at: ago(7_200_000), severity: 'info', kind: 'route_change', text: 'Ollama model qwen3 · 32B loaded for research task (simulated).' },
-  { id: 'ev-3', at: ago(9_000_000), severity: 'error', kind: 'fallback', text: 'SearXNG timeout after 8 s; direct source fetch used (simulated).' },
-  { id: 'ev-4', at: ago(12_600_000), severity: 'info', kind: 'route_change', text: 'Routing rule updated: coding tasks escalate to T3 before T2 (simulated).' },
-];
-
-export const seedRecentRoutes: RouteInfo[] = [
-  { id: 'rt-101', at: ago(120_000), tier: 'T0', provider: 'native', model: null, dataClass: 'Public', locality: 'Local', reason: 'Deterministic utility; no model call', fallbacks: [], latencyMs: 3, category: 'Deterministic', outcome: 'ok', simulated: true },
-  { id: 'rt-102', at: ago(900_000), tier: 'T2', provider: 'ollama', model: 'qwen3 · 8B (candidate)', dataClass: 'Personal', locality: 'Local', reason: 'Memory-grounded answer; explicit facts only', fallbacks: ['llama_cpp'], latencyMs: 1480, category: 'Personal memory', outcome: 'ok', simulated: true },
-  { id: 'rt-103', at: ago(3_600_000), tier: 'T3', provider: 'ollama', model: 'qwen3 · 32B (candidate)', dataClass: 'Project', locality: 'Local', reason: 'Multi-step research', fallbacks: ['llama_cpp', 'T2 local model'], latencyMs: 47210, category: 'Research', outcome: 'fallback', simulated: true },
-  { id: 'rt-104', at: ago(5_400_000), tier: 'T2', provider: 'ollama', model: 'qwen3 · 8B (candidate)', dataClass: 'Project', locality: 'Local', reason: 'Coding task; context from the project', fallbacks: ['llama_cpp'], latencyMs: 2210, category: 'Coding', outcome: 'ok', simulated: true },
-  { id: 'rt-105', at: ago(7_000_000), tier: 'T4', provider: 'searxng', model: null, dataClass: 'Public', locality: 'Local', reason: 'Public search query (Public class only)', fallbacks: ['direct fetch'], latencyMs: 8000, category: 'Research', outcome: 'failed', simulated: true },
-];
+/** No seeded events or routes: the timeline and recent list record only what happens in this session. */
+export const seedRoutingEvents: RoutingEvent[] = [];
+export const seedRecentRoutes: RouteInfo[] = [];
 
 export const seedRules: PolicyRule[] = [
   { id: 'r-read', group: 'Read files', scope: 'inside_project', autonomy: 'automatic', locked: false, explanation: 'Reading permitted project files.' },
@@ -125,50 +112,42 @@ export const seedRules: PolicyRule[] = [
   { id: 'r-system-else', group: 'System changes', scope: 'elsewhere', autonomy: 'blocked', locked: true, explanation: 'Privileged commands and system settings are blocked in v1.' },
 ];
 
-export const seedAudit: AuditEntry[] = [
-  { id: 'au-1', at: ago(4_000_000), kind: 'policy.decision', summary: 'fs.read on project file docs/edith/README.md', decision: 'allow (automatic)' },
-  { id: 'au-2', at: ago(3_900_000), kind: 'approval.resolved', summary: 'Owner approved patch preview (2 files)', decision: 'approve · task scope' },
-  { id: 'au-3', at: ago(3_000_000), kind: 'egress', summary: 'Search query sent to SearXNG (Public class, 9 words)', decision: 'allow (consent: Public)' },
-  { id: 'au-4', at: ago(1_800_000), kind: 'policy.decision', summary: 'Network write attempted to unknown host', decision: 'confirm → denied by owner' },
-  { id: 'au-5', at: ago(600_000), kind: 'memory.write', summary: 'Explicit fact stored: timezone', decision: 'allow' },
-];
+/** Audit starts empty. Only decisions made in this session are recorded. */
+export const seedAudit: AuditEntry[] = [];
 
-export const seedTrusts: TrustGrant[] = [
-  { id: 'tr-1', scope: 'Run cargo test in this project', grantedAt: ago(2 * DAY), expiresAt: new Date(Date.now() + 5 * DAY).toISOString() },
-];
+/** No trusted grants exist at start. */
+export const seedTrusts: TrustGrant[] = [];
 
+/** Sample configurations. Nothing is launched: every server starts as stopped, and no tool call is made. */
 export const seedMcpServers: McpServer[] = [
   {
-    id: 'project-files', name: 'project-files', transport: 'stdio', endpoint: 'example child process (not launched)', source: 'EDITH registry', state: 'ready', enabled: true, simulated: true,
+    id: 'project-files', name: 'project-files (sample)', transport: 'stdio', endpoint: 'sample configuration; no process is started', source: 'EDITH sample registry', state: 'stopped', reason: 'Sample only. The prototype cannot launch MCP servers.', enabled: false, simulated: true,
     tools: [
       { name: 'read_file', description: 'Read a text file inside the configured project root.', sideEffect: 'read', enabled: true, autonomy: 'automatic' },
       { name: 'list_directory', description: 'List entries of a directory inside the project root.', sideEffect: 'read', enabled: true, autonomy: 'automatic' },
       { name: 'write_file', description: 'Create or overwrite a file inside the project root.', sideEffect: 'write', enabled: true, autonomy: 'policy_controlled' },
     ],
-    resources: ['project://README.md', 'project://docs/edith/'],
-    prompts: ['summarise-module'],
-    history: [
-      { id: 'mc-1', at: ago(600_000), capability: 'mcp:project-files/read_file', durationMs: 14, status: 'ok', summary: 'docs/edith/README.md (simulated)' },
-      { id: 'mc-2', at: ago(1_200_000), capability: 'mcp:project-files/list_directory', durationMs: 9, status: 'ok', summary: 'docs/edith (simulated)' },
-    ],
+    resources: [],
+    prompts: [],
+    history: [],
   },
   {
-    id: 'web-docs', name: 'web-docs', transport: 'streamable_http', endpoint: 'https://docs.example.invalid/mcp (example)', source: 'OpenCode opencode.json (read-only hint)', state: 'unavailable', reason: 'Authentication not configured. Add a secret reference in the registry (simulated).', enabled: true, simulated: true,
+    id: 'web-docs', name: 'web-docs (sample)', transport: 'streamable_http', endpoint: 'sample configuration; no connection is made', source: 'EDITH sample registry', state: 'stopped', reason: 'Sample only. Not connected in the prototype.', enabled: false, simulated: true,
     tools: [
       { name: 'search_docs', description: 'Search documentation pages for a query.', sideEffect: 'network', enabled: true, autonomy: 'automatic' },
       { name: 'fetch_page', description: 'Fetch one documentation page as text.', sideEffect: 'network', enabled: true, autonomy: 'automatic' },
     ],
     resources: [],
     prompts: [],
-    history: [{ id: 'mc-3', at: ago(7_200_000), capability: 'mcp:web-docs/search_docs', durationMs: 10000, status: 'timeout', summary: 'Timed out after 10 s (simulated)' }],
+    history: [],
   },
   {
-    id: 'issue-tracker', name: 'issue-tracker', transport: 'stdio', endpoint: 'example child process (not launched)', source: 'Claude Code settings (read-only hint)', state: 'degraded', reason: 'Two recent call errors (simulated). Health probe pending.', enabled: false, simulated: true,
+    id: 'issue-tracker', name: 'issue-tracker (sample)', transport: 'stdio', endpoint: 'sample configuration; no process is started', source: 'EDITH sample registry', state: 'stopped', reason: 'Sample only. Not connected in the prototype.', enabled: false, simulated: true,
     tools: [
       { name: 'list_issues', description: 'List open issues for a repository.', sideEffect: 'network', enabled: false, autonomy: 'confirm_required' },
       { name: 'create_issue', description: 'Create an issue in a repository.', sideEffect: 'network', enabled: false, autonomy: 'confirm_required' },
     ],
-    resources: ['issues://open'],
+    resources: [],
     prompts: [],
     history: [],
   },
@@ -181,16 +160,12 @@ export const seedSkills: Skill[] = [
   { id: 'meeting-notes', name: 'meeting-notes', version: '0.2.0', kind: 'instruction', description: 'Turn raw meeting notes into decisions and action items. Use when the user shares meeting notes.', adapter: 'opencode', enabled: false, hashStatus: 'approved', requires: [], compatibility: 'EDITH ≥ 0.1', simulated: true },
 ];
 
+/** Session start notes. They state what the prototype does not do. */
 export function seedLogs(): LogEntry[] {
   return [
-    { id: 'lg-1', at: ago(5_000), level: 'info', subsystem: 'daemon', message: 'Health OK (simulated daemon, no backend in prototype)', traceId: 'tr-0001' },
-    { id: 'lg-2', at: ago(4_000), level: 'debug', subsystem: 'router', message: 'T0 match: clock utility, no model call', traceId: 'tr-0002' },
-    { id: 'lg-3', at: ago(3_500), level: 'debug', subsystem: 'router', message: 'T0 match: calculator, no model call', traceId: 'tr-0002' },
-    { id: 'lg-4', at: ago(3_000), level: 'warn', subsystem: 'models', message: 'llama_cpp: connection refused (simulated)', traceId: 'tr-0003' },
-    { id: 'lg-5', at: ago(2_000), level: 'info', subsystem: 'policy', message: 'Decision allow: fs.read project file (automatic)', traceId: 'tr-0004' },
-    { id: 'lg-6', at: ago(1_500), level: 'info', subsystem: 'orchestrator', message: 'task created: research (8 subtasks, simulated)', traceId: 'tr-0005' },
-    { id: 'lg-7', at: ago(1_000), level: 'error', subsystem: 'search', message: 'searxng timeout after 8 s (simulated)', traceId: 'tr-0005' },
-    { id: 'lg-8', at: ago(500), level: 'info', subsystem: 'orchestrator', message: 'retry scheduled for one step (simulated)', traceId: 'tr-0005' },
+    { id: 'lg-1', at: ago(2_000), level: 'info', subsystem: 'daemon', message: 'Prototype started. No daemon is connected; the status is unknown.', traceId: 'tr-0001' },
+    { id: 'lg-2', at: ago(1_500), level: 'info', subsystem: 'models', message: 'Model catalogue loaded from published data (checked 2026-11-03). No provider was contacted.', traceId: 'tr-0002' },
+    { id: 'lg-3', at: ago(1_000), level: 'info', subsystem: 'network', message: 'No network request made by the prototype.', traceId: 'tr-0003' },
   ];
 }
 

@@ -11,7 +11,7 @@ import type {
   TaskSubtask,
   ToolCall,
 } from '../../types/contracts';
-import { planFor, verificationLabel } from './logic';
+import { orchestrationOf, planFor, verificationLabel } from './logic';
 import { nextId, nowIso } from './ids';
 import { evidenceFor } from '../../data/searchBank';
 
@@ -147,7 +147,7 @@ export function createTaskService(deps: { diag: DiagnosticsService; notify: Noti
       const verdicts = t.verdicts.map((v) => ({
         ...v,
         verdict: failing ? ('fail' as const) : ('pass' as const),
-        evidence: failing ? 'Patch not applied — see blocker' : 'Simulated check passed',
+        evidence: failing ? 'Patch not applied (simulated blocker)' : 'Simulated only: no real check ran',
       }));
       const evidence = t.intent === 'research' ? evidenceFor(t.objective) : [];
       const unresolved = t.intent === 'research' ? ['Pricing and licence terms of the alternatives were not checked (no source in this prototype).'] : [];
@@ -192,7 +192,7 @@ export function createTaskService(deps: { diag: DiagnosticsService; notify: Noti
         for (const st of timedOut) {
           y.errors = [
             ...y.errors,
-            { id: nextId('err'), at: now, message: `${st.label}: provider timed out after 8 s (simulated)`, recovery: 'Retrying this step once. If it fails again, the step is skipped and reported.' },
+            { id: nextId('err'), at: now, message: `${st.label}: injected failure for this demo (simulated; no provider was contacted)`, recovery: 'Retrying this step once. If it fails again, the step is skipped and reported.' },
           ];
           y = withEvent(y, 'step.retry', `${st.label} — timed out, retry scheduled (simulated)`);
           y.state = 'Recovering';
@@ -296,6 +296,7 @@ export function createTaskService(deps: { diag: DiagnosticsService; notify: Noti
       changedFiles: [],
       unresolved: [],
       route,
+      orchestration: orchestrationOf(intent, plan),
       simulated: true,
     };
     tasks.set((list) => [record, ...list].slice(0, 30));

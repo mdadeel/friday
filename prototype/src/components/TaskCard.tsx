@@ -46,6 +46,9 @@ export function TaskCard({ task }: { task: TaskRecord }) {
       <p className="small faint">
         {done}/{total} {en.now.progress} · {en.task.verification}: {task.verification.replace(/_/g, '-')}
       </p>
+      <p className="small faint">
+        {en.task.orchestration}: {task.orchestration.pattern} · {task.orchestration.steps} steps · up to {task.orchestration.maxParallel} in parallel · {task.orchestration.approvalGates} approval gate(s)
+      </p>
 
       {approvals.map((a) => (
         <ApprovalCard key={a.id} approval={a} />

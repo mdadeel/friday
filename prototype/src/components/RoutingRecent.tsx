@@ -21,9 +21,9 @@ export function RoutingRecent({ routes }: { routes: RouteInfo[] }) {
     { key: 'cat', header: 'Category', render: (r) => r.category },
     { key: 'tier', header: 'Tier', render: (r) => <Badge tone={tierTone(r.tier)}>{r.tier}</Badge> },
     { key: 'model', header: 'Route', render: (r) => <span>{r.provider} · {r.model ?? en.route.noModel}</span> },
+    { key: 'exec', header: 'Executed by', render: (r) => (r.executedBy === 'browser' ? en.route.ranInBrowser : en.route.noModelCalled) },
     { key: 'dc', header: 'Data', render: (r) => `${r.dataClass} · ${r.locality}` },
     { key: 'out', header: 'Outcome', render: (r) => <Badge tone={r.outcome === 'ok' ? 'ok' : r.outcome === 'fallback' ? 'warn' : 'error'}>{r.outcome}</Badge> },
-    { key: 'lat', header: 'Latency', align: 'right', render: (r) => `${r.latencyMs} ms` },
   ];
   return (
     <div className="stack">

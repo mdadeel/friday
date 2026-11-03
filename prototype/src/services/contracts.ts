@@ -68,7 +68,6 @@ export interface RoutingService extends Observable<RoutingState> {
   record(route: RouteInfo): void;
   setTier(tier: Tier, patch: { provider?: string; model?: string }): void;
   setFallbacks(tier: Tier, fallbacks: string[]): void;
-  setModelLoaded(id: string, loaded: boolean): void;
   probe(providerId: string): void;
   testRoute(text: string): RouteInfo | null;
 }

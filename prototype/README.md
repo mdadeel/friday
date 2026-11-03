@@ -32,7 +32,7 @@ An interactive web prototype of the EDITH screens described in `docs/edith/`.
 npm install
 npm run dev        # http://0.0.0.0:5173
 npm run typecheck
-npm test           # logic + service tests
+npm test           # logic + service + UI tests (see SOURCES.md for the source checks)
 npm run build      # typecheck + production build to dist/
 ```
 
@@ -48,3 +48,7 @@ npm run build      # typecheck + production build to dist/
 ## Redesign status
 
 The UI was rebuilt in the redesign pass. The screens, components and token mapping are listed in `CONFORMANCE.md`, which records what is done, partial or not done against the UI spec and design system. Run the checks with `npm run typecheck`, `npm test`, and `npm run build`. Component tests use Vitest and Testing Library (`npm run test:ui`).
+
+## Accuracy
+
+Every model, provider, performance and source claim in the prototype is either checked against a listed source (`SOURCES.md`) or labelled as simulated or unverified. Provider states start as `unknown`, model status is `not checked`, and session counts start at zero.

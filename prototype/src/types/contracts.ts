@@ -29,20 +29,31 @@ export interface RouteInfo {
   locality: Locality;
   reason: string;
   fallbacks: string[];
-  latencyMs: number;
   category: string;
   outcome: 'ok' | 'fallback' | 'failed';
+  /** 'browser' only for Tier 0 utilities. Model routes are decisions: no model is called. */
+  executedBy: 'browser' | 'none';
   simulated: true;
 }
 
+/** A source from the fixed reference list. `checkedOn` is when a person opened the page; it is not a publication date. */
 export interface EvidenceSource {
   id: string;
   title: string;
   url: string;
   authorityTier: 1 | 2 | 3;
-  date: string;
-  spans: number;
+  checkedOn: string;
+  claim: string;
   simulated: true;
+}
+
+/** How the work is organised: no orchestration, a deterministic utility, or a dependency graph of steps. */
+export interface Orchestration {
+  pattern: 'direct' | 'deterministic' | 'dag';
+  steps: number;
+  maxParallel: number;
+  approvalGates: number;
+  reason: string;
 }
 
 export interface ChatMessage {
@@ -136,6 +147,7 @@ export interface TaskRecord {
   changedFiles: ChangedFile[];
   unresolved: string[];
   route?: RouteInfo;
+  orchestration: Orchestration;
   outcome?: 'completed' | 'failed' | 'cancelled';
   blocker?: string;
   simulated: true;
@@ -227,7 +239,8 @@ export interface Skill {
   simulated: true;
 }
 
-export type ProviderHealth = 'up' | 'degraded' | 'down' | 'not_configured' | 'probing';
+/** 'unknown' means not probed. The prototype never claims a provider is up without a real check. */
+export type ProviderHealth = 'up' | 'degraded' | 'down' | 'not_configured' | 'probing' | 'unknown';
 
 export interface ProviderInfo {
   id: string;
@@ -235,21 +248,26 @@ export interface ProviderInfo {
   kind: 'local_server' | 'cloud' | 'native' | 'speech' | 'search';
   endpoint: string;
   health: ProviderHealth;
-  lastProbe: string;
+  /** Why the health value is what it is, for example "Not probed". */
+  reason: string;
+  lastProbe?: string;
   consent: DataClass[];
   models: string[];
   simulated: true;
 }
 
+/** A model from the published catalogue. `status` is always 'not_checked' in the prototype: nothing is installed or probed. */
 export interface LocalModel {
   id: string;
   provider: string;
+  /** Ollama tag, for example qwen3:8b. */
   name: string;
-  sizeGB: number;
-  quant: string;
-  contextTokens: number;
-  toolCalling: 'declared' | 'unknown';
-  loaded: boolean;
+  sizeLabel: string;
+  context: string;
+  capabilities: string[];
+  source: string;
+  checkedOn: string;
+  status: 'not_checked';
   simulated: true;
 }
 
@@ -264,8 +282,8 @@ export interface TierConfig {
 export interface CategoryStat {
   category: string;
   route: string;
-  successRate: number;
-  medianMs: number;
+  /** Count of routes recorded in this browser session. */
+  calls: number;
 }
 
 export interface RoutingEvent {
@@ -283,10 +301,11 @@ export interface RoutingState {
   categories: CategoryStat[];
   recent: RouteInfo[];
   events: RoutingEvent[];
-  requests24h: number;
-  noModelShare: number;
-  medianFirstTokenMs: number;
-  fallbacks24h: number;
+  /** Counts from this browser session only. Nothing is measured over 24 hours. */
+  sessionRequests: number;
+  browserAnswered: number;
+  modelCalls: number;
+  fallbacks: number;
   simulated: true;
 }
 

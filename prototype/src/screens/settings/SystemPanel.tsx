@@ -7,7 +7,7 @@ import { useState } from 'react';
 const FACTS: [string, string][] = [
   ['Application version', '0.1.0 (prototype)'],
   ['API version', 'not applicable (no daemon)'],
-  ['Socket path', '$XDG_RUNTIME_DIR/edith/api.sock (mode 0600)'],
+  ['Socket path (designed, not observed)', '$XDG_RUNTIME_DIR/edith/api.sock (mode 0600, per the blueprint)'],
   ['Storage usage', 'not observable in the browser'],
   ['Database backup', 'not applicable (no database)'],
   ['GPU and RAM', 'not observable in the browser'],

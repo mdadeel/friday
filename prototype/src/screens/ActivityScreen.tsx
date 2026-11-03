@@ -173,6 +173,14 @@ function TaskDetail({ task, providers }: { task: TaskRecord; providers: Provider
             <dd>{task.route.dataClass}</dd>
             <dt>{en.activity.locality}</dt>
             <dd>{task.route.locality === 'Local' ? en.route.local : en.route.cloud}</dd>
+            <dt>Executed by</dt>
+            <dd>{task.route.executedBy === 'browser' ? en.route.ranInBrowser : en.route.noModelCalled}</dd>
+            <dt>{en.task.orchestration}</dt>
+            <dd>
+              {task.orchestration.pattern} · {task.orchestration.steps} steps · up to {task.orchestration.maxParallel} in parallel · {task.orchestration.approvalGates} approval gate(s)
+              <br />
+              <span className="small faint">{task.orchestration.reason}</span>
+            </dd>
           </dl>
         ) : (
           <p className="empty">No route recorded.</p>
