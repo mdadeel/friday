@@ -44,22 +44,71 @@ export function createDaemonConversationService(client: DaemonClient): Conversat
 
     if (kind === 'message.delta') {
       const delta = envelope.payload?.delta || '';
-      if (currentStreamingMsgId && delta) {
+      const thinkingDelta = envelope.payload?.thinking_delta || '';
+      if (currentStreamingMsgId && (delta || thinkingDelta)) {
         store.set((msgs) =>
           msgs.map((m) =>
             m.id === currentStreamingMsgId
-              ? { ...m, text: m.text + delta, streaming: true }
+              ? {
+                  ...m,
+                  text: m.text + delta,
+                  thinking: (m.thinking || '') + thinkingDelta,
+                  streaming: true,
+                }
               : m
           )
         );
       }
+    } else if (kind === 'tool.invoking') {
+      const toolName = envelope.payload?.tool || 'unknown';
+      const input = envelope.payload?.input;
+      if (currentStreamingMsgId) {
+        store.set((msgs) =>
+          msgs.map((m) => {
+            if (m.id !== currentStreamingMsgId) return m;
+            const existing = m.toolCalls || [];
+            return {
+              ...m,
+              toolCalls: [
+                ...existing,
+                { name: toolName, input, status: 'running' as const },
+              ],
+            };
+          })
+        );
+      }
+    } else if (kind === 'tool.completed') {
+      const toolName = envelope.payload?.tool || 'unknown';
+      const output = envelope.payload?.output;
+      if (currentStreamingMsgId) {
+        store.set((msgs) =>
+          msgs.map((m) => {
+            if (m.id !== currentStreamingMsgId) return m;
+            const existing = m.toolCalls || [];
+            return {
+              ...m,
+              toolCalls: existing.map((tc) =>
+                tc.name === toolName
+                  ? { ...tc, output, status: 'completed' as const }
+                  : tc
+              ),
+            };
+          })
+        );
+      }
     } else if (kind === 'message.final') {
       const finalText = envelope.payload?.content || envelope.payload?.text || '';
+      const thinking = envelope.payload?.thinking || undefined;
       if (currentStreamingMsgId) {
         store.set((msgs) =>
           msgs.map((m) =>
             m.id === currentStreamingMsgId
-              ? { ...m, text: finalText || m.text, streaming: false }
+              ? {
+                  ...m,
+                  text: finalText || m.text,
+                  thinking: thinking || m.thinking,
+                  streaming: false,
+                }
               : m
           )
         );

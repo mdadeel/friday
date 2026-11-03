@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ChatMessage, TaskRecord } from '../types/contracts';
 import { useObservable, useServices } from '../app/services';
 import { VoiceStrip } from '../components/VoiceStrip';
 import { ApprovalCard, TaskCard, TERMINAL_STATES, stateTone, progressOf } from '../components/TaskViews';
-import { Badge, Empty, Panel, SimBadge, fmtTime } from '../components/ui';
+import { Badge, Empty, Panel, SimBadge } from '../components/ui';
 import { navigate } from '../app/router';
+import { MessageItem, PromptInput } from '../components/ai';
 
 const QUICK_PROMPTS = [
   'What time is it?',
@@ -22,19 +23,12 @@ export function ConversationScreen() {
   const approvals = useObservable(s.tasks.approvals);
   const voice = useObservable(s.voice);
   const routing = useObservable(s.routing);
-  const [draft, setDraft] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
   const last = messages[messages.length - 1];
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [messages.length, last?.text]);
-
-  const send = (text: string) => {
-    if (!text.trim()) return;
-    s.conversation.send(text);
-    setDraft('');
-  };
 
   const activeTask = tasks.find((t) => !TERMINAL_STATES.includes(t.state)) ?? tasks[0];
   const pending = approvals.filter((a) => a.status === 'pending');
@@ -51,41 +45,10 @@ export function ConversationScreen() {
           <div ref={endRef} />
         </div>
 
-        <div className="quick" aria-label="Example requests">
-          {QUICK_PROMPTS.map((p) => (
-            <button key={p} type="button" className="chip" onClick={() => send(p)}>
-              {p}
-            </button>
-          ))}
-        </div>
-
-        <form
-          className="composer"
-          onSubmit={(e) => {
-            e.preventDefault();
-            send(draft);
-          }}
-        >
-          <label htmlFor="composer" className="sr-only">
-            Message EDITH
-          </label>
-          <textarea
-            id="composer"
-            rows={2}
-            value={draft}
-            placeholder="Type a request. Try a quick prompt above."
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send(draft);
-              }
-            }}
-          />
-          <button type="submit" className="btn primary" disabled={!draft.trim()}>
-            Send
-          </button>
-        </form>
+        <PromptInput
+          onSend={(text, source) => s.conversation.send(text, source)}
+          quickPrompts={QUICK_PROMPTS}
+        />
       </section>
 
       <aside className="now-panel" aria-label="Now">
@@ -141,30 +104,7 @@ function MessageView({ message, tasks }: { message: ChatMessage; tasks: TaskReco
       </div>
     );
   }
-  const mine = message.role === 'owner';
-  return (
-    <div className={`msg-row ${mine ? 'owner' : 'edith'}`}>
-      <div className={`bubble ${mine ? 'bubble-owner' : 'bubble-edith'}`}>
-        <div className="bubble-meta small muted">
-          {mine ? 'You' : 'EDITH'} · {fmtTime(message.at)} · {message.source === 'voice' ? 'voice' : 'text'}
-          {message.simulated && <> · simulated</>}
-        </div>
-        <p className="bubble-text">
-          {message.text}
-          {message.streaming && <span className="caret" aria-hidden="true">▍</span>}
-        </p>
-        {message.route && !message.streaming && (
-          <div className="route-foot small">
-            <Badge tone={message.route.tier === 'T0' ? 'ok' : 'info'}>{message.route.tier}</Badge>
-            <span className="muted">
-              {message.route.provider}
-              {message.route.model ? ` · ${message.route.model}` : ' · no model call'} · {message.route.latencyMs} ms
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <MessageItem message={message} />;
 }
 
 function ActiveSummary({ task }: { task: TaskRecord }) {

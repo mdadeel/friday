@@ -194,7 +194,115 @@ impl AgentRuntime {
             });
         }
 
-        // 6. Determine whether objective requires a multi-step plan
+        let mut messages = messages;
+        let lower_obj = objective.to_lowercase();
+
+        // 6. Autonomous Grounding & Tool Execution (ReAct Pre-Execution)
+        if lower_obj.contains("search") || lower_obj.contains("look up") || lower_obj.contains("find online") || lower_obj.contains("research") {
+            let query = objective.replace("search for", "").replace("search", "").replace("look up", "").trim().to_string();
+            let q = if query.is_empty() { objective.to_string() } else { query };
+
+            self.event_bus.publish(
+                EventEnvelope::new(
+                    "tool.invoking",
+                    serde_json::json!({
+                        "session_id": session_id,
+                        "task_id": task_id,
+                        "tool": "web.search",
+                        "input": { "query": &q, "limit": 4 }
+                    }),
+                )
+                .with_task(task_id),
+            );
+
+            if let Ok(res) = self.executor.tool_registry().invoke("web.search", serde_json::json!({"query": q, "limit": 4}), self.executor.policy_engine()).await {
+                self.event_bus.publish(
+                    EventEnvelope::new(
+                        "tool.completed",
+                        serde_json::json!({
+                            "session_id": session_id,
+                            "task_id": task_id,
+                            "tool": "web.search",
+                            "output": res
+                        }),
+                    )
+                    .with_task(task_id),
+                );
+
+                messages.push(ChatMessage::system(format!(
+                    "Ground Truth Search Observation for '{}':\n{}\n\nUse this verified search evidence to ground your answer with specific facts and cite sources.",
+                    objective, res
+                )));
+            }
+        } else if lower_obj.contains("system metrics") || lower_obj.contains("cpu usage") || lower_obj.contains("ram usage") || lower_obj.contains("telemetry") {
+            self.event_bus.publish(
+                EventEnvelope::new(
+                    "tool.invoking",
+                    serde_json::json!({
+                        "session_id": session_id,
+                        "task_id": task_id,
+                        "tool": "desktop.system_metrics",
+                        "input": {}
+                    }),
+                )
+                .with_task(task_id),
+            );
+
+            if let Ok(res) = self.executor.tool_registry().invoke("desktop.system_metrics", serde_json::json!({}), self.executor.policy_engine()).await {
+                self.event_bus.publish(
+                    EventEnvelope::new(
+                        "tool.completed",
+                        serde_json::json!({
+                            "session_id": session_id,
+                            "task_id": task_id,
+                            "tool": "desktop.system_metrics",
+                            "output": res
+                        }),
+                    )
+                    .with_task(task_id),
+                );
+
+                messages.push(ChatMessage::system(format!(
+                    "Ground Truth Host System Telemetry:\n{}\n\nUse these exact metrics in your response.",
+                    res
+                )));
+            }
+        } else if lower_obj.contains("list files") || lower_obj.contains("show files") || lower_obj.contains("files in repo") {
+            self.event_bus.publish(
+                EventEnvelope::new(
+                    "tool.invoking",
+                    serde_json::json!({
+                        "session_id": session_id,
+                        "task_id": task_id,
+                        "tool": "fs.list_dir",
+                        "input": { "path": "." }
+                    }),
+                )
+                .with_task(task_id),
+            );
+
+            if let Ok(res) = self.executor.tool_registry().invoke("fs.list_dir", serde_json::json!({"path": "."}), self.executor.policy_engine()).await {
+                self.event_bus.publish(
+                    EventEnvelope::new(
+                        "tool.completed",
+                        serde_json::json!({
+                            "session_id": session_id,
+                            "task_id": task_id,
+                            "tool": "fs.list_dir",
+                            "output": res
+                        }),
+                    )
+                    .with_task(task_id),
+                );
+
+                messages.push(ChatMessage::system(format!(
+                    "Ground Truth Filesystem Listing (Current Directory):\n{}\n\nRefer to these real files in your answer.",
+                    res
+                )));
+            }
+        }
+
+        // 7. Determine whether objective requires a multi-step plan
         let is_complex_task = objective.to_lowercase().contains("plan")
             || objective.to_lowercase().contains("steps")
             || objective.to_lowercase().contains("build");

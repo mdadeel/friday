@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use crate::error::{Result, ToolError};
-use crate::native::{DateTimeTool, FsListTool, FsReadTool, FsWriteTool, SystemCommandTool};
+use crate::native::{BrowserOpenTool, DateTimeTool, FsListTool, FsReadTool, FsWriteTool, SystemCommandTool};
 use crate::policy::{PolicyDecision, PolicyEngine};
 use crate::tool::{DynTool, ToolDescriptor};
 
@@ -33,6 +33,7 @@ impl ToolRegistry {
         registry.register(Arc::new(FsListTool));
         registry.register(Arc::new(SystemCommandTool));
         registry.register(Arc::new(DateTimeTool));
+        registry.register(Arc::new(BrowserOpenTool));
         registry
     }
 
@@ -120,12 +121,13 @@ mod tests {
         assert!(registry.contains("fs.list_dir"));
         assert!(registry.contains("system.execute_command"));
         assert!(registry.contains("datetime.now"));
+        assert!(registry.contains("browser.open_url"));
 
         let descriptors = registry.list_descriptors();
-        assert_eq!(descriptors.len(), 5);
+        assert_eq!(descriptors.len(), 6);
 
         let schemas = registry.export_schemas();
-        assert_eq!(schemas.len(), 5);
+        assert_eq!(schemas.len(), 6);
     }
 
     #[tokio::test]

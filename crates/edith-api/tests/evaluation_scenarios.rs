@@ -193,7 +193,7 @@ async fn test_evaluation_scenario_4_desktop_telemetry_and_capabilities() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(val["count"], 11);
+    assert_eq!(val["count"], 12);
 }
 
 #[tokio::test]

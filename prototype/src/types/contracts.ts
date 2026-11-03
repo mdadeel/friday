@@ -53,6 +53,8 @@ export interface ChatMessage {
   taskId?: string;
   approvalId?: string;
   streaming?: boolean;
+  thinking?: string;
+  toolCalls?: Array<{ name: string; input?: any; output?: any; status: 'running' | 'completed' | 'failed' }>;
   sources?: EvidenceSource[];
   simulated?: boolean;
 }

@@ -669,7 +669,8 @@ async fn test_search_endpoints_and_ssrf_protection() {
     assert!(tool_names.contains(&"desktop.list_apps"));
     assert!(tool_names.contains(&"desktop.launch_app"));
     assert!(tool_names.contains(&"desktop.active_window"));
-    assert_eq!(tool_names.len(), 11); // 5 native + 2 web + 4 desktop
+    assert!(tool_names.contains(&"browser.open_url"));
+    assert_eq!(tool_names.len(), 12); // 6 native + 2 web + 4 desktop
 }
 
 #[tokio::test]
