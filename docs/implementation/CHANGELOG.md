@@ -1,5 +1,28 @@
 # EDITH 2.0 — Engineering Changelog
 
+## [0.4.0] - 2026-11-03
+
+### Phase 4: Agent Runtime & Orchestration
+- Created crate [`crates/edith-agent`](crates/edith-agent):
+  - Implemented `TaskStateMachine` enforcing legal lifecycle transitions (`Discovered` -> `Planning` -> `Executing` -> `Verifying` -> `Completed` / `Failed` / `Cancelled`) with guard validation.
+  - Implemented `Plan`, `PlanStep`, and dependency wave topological graph solver in `plan.rs`.
+  - Implemented `ContextBuilder` assembling dynamic system prompt, current timestamp/timezone, tool definitions, working scratchpad, and token-bounded conversation history.
+  - Implemented `VerificationEngine` enforcing mechanical, evidence-based, and user-confirmed verification gates.
+  - Implemented `ExecutionEngine` executing multi-step plan waves concurrently, dispatching step handlers, emitting lifecycle events (`step.started`, `step.completed`, `step.failed`), and handling early cancellation.
+  - Implemented `AgentRuntime` coordinating end-to-end task execution:
+    - Automatically classifies objectives into conversational streaming or multi-step execution graphs.
+    - Transitions task state across lifecycle and synchronizes changes in SQLite and EventBus.
+- Integrated `AgentRuntime` into `edith-api`:
+  - Added `AgentRuntime` to `AppState`.
+  - Updated `POST /v1/sessions/{id}/messages` to delegate objective execution directly to `AgentRuntime`.
+  - Removed duplicate streaming worker in favor of the unified agent runtime.
+- Verification & Testing:
+  - 11 unit and integration tests added in `crates/edith-agent`.
+  - Full workspace test suite passes (26 tests total).
+  - Verified live daemon execution with curl: multi-step plan generated, executed, verified, and completed.
+
+---
+
 ## [0.3.0] - 2026-11-03
 
 ### Phase 3: Conversation Engine

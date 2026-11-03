@@ -41,8 +41,18 @@
 ## Epic 4: Agent Runtime & Orchestration (Phase 4)
 
 | Task ID | Component | Description | Status | Verification Criteria |
+| **TSK-401** | `edith-agent` | Task state machine (`discovered` -> `planning` -> `executing` -> `verifying` -> `completed` / `failed`) | **Completed** | State transition unit tests pass |
+| **TSK-402** | `edith-agent` | Context builder assembling working context, user preferences, and token-bounded history | **Completed** | Token budget bounded context tests pass |
+| **TSK-403** | `edith-agent` | Plan generation and wave execution loop with dependency solver | **Completed** | Multi-step mock plan execution passes |
+| **TSK-404** | `edith-agent` | Verification engine enforcing mechanical, evidence-based, or user-confirmed gates | **Completed** | Verification failure stops execution before completion |
+
+---
+
+## Epic 5: Intelligent Model Routing (Phase 5)
+
+| Task ID | Component | Description | Status | Verification Criteria |
 |---------|-----------|-------------|--------|-----------------------|
-| **TSK-401** | `edith-agent` | Task state machine (`discovered` -> `planning` -> `executing` -> `verifying` -> `completed` / `failed`) | Planned | State transition unit tests pass |
-| **TSK-402** | `edith-agent` | Context builder assembling working context, user preferences, and history | Planned | Token budget bounded context tests pass |
-| **TSK-403** | `edith-agent` | Plan generation and step execution loop | Planned | Multi-step mock plan execution passes |
-| **TSK-404** | `edith-agent` | Verification engine enforcing mechanical, evidence-based, or user-confirmed gates | Planned | Verification failure stops execution before completion |
+| **TSK-501** | `edith-router` | Deterministic Tier 0 matcher (local system time, date, math, status without model) | Planned | Unit tests pass on deterministic patterns |
+| **TSK-502** | `edith-router` | Complexity classifier mapping objectives to Tiers (T0-T4) | Planned | Benchmark routing tests match Arena specs |
+| **TSK-503** | `edith-router` | Fallback escalation chain (T1 fast local -> T2 reasoning local -> T3/T4 cloud) | Planned | Provider outage escalates to fallback model |
+| **TSK-504** | `edith-router` | Audit route decision persistence in `route_decisions` table | Planned | SQLite audit record verified |

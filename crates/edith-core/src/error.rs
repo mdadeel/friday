@@ -20,6 +20,12 @@ pub enum EdithError {
     #[error("Task error: {0}")]
     Task(String),
 
+    #[error("Agent error: {0}")]
+    Agent(String),
+
+    #[error("Model error: {0}")]
+    Model(String),
+
     #[error("Policy violation: {0}")]
     Policy(String),
 

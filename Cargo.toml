@@ -5,6 +5,7 @@ members = [
     "crates/edith-events",
     "crates/edith-storage",
     "crates/edith-models",
+    "crates/edith-agent",
     "crates/edith-api",
     "apps/daemon",
 ]
@@ -20,6 +21,7 @@ edith-core = { path = "crates/edith-core" }
 edith-events = { path = "crates/edith-events" }
 edith-storage = { path = "crates/edith-storage" }
 edith-models = { path = "crates/edith-models" }
+edith-agent = { path = "crates/edith-agent" }
 edith-api = { path = "crates/edith-api" }
 
 async-trait = { version = "0.1" }

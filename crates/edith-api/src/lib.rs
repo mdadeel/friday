@@ -10,9 +10,10 @@ use axum::{
     Json, Router,
 };
 use chrono::Utc;
+use edith_agent::AgentRuntime;
 use edith_core::{TaskOrigin, TaskPriority, VerificationMode};
 use edith_events::{EventBus, EventEnvelope};
-use edith_models::{ChatMessage, ModelRequest, ProviderRegistry};
+use edith_models::ProviderRegistry;
 use edith_storage::Storage;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -23,13 +24,14 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
-use tracing::{info, warn};
+use tracing::warn;
 
 #[derive(Clone)]
 pub struct AppState {
     pub storage: Storage,
     pub event_bus: EventBus,
     pub models: ProviderRegistry,
+    pub agent: AgentRuntime,
     pub active_cancellations: Arc<RwLock<HashMap<String, CancellationToken>>>,
     pub auth_token: Option<String>,
 }
@@ -41,10 +43,12 @@ impl AppState {
         models: ProviderRegistry,
         auth_token: Option<String>,
     ) -> Self {
+        let agent = AgentRuntime::new(storage.clone(), event_bus.clone(), models.clone());
         Self {
             storage,
             event_bus,
             models,
+            agent,
             active_cancellations: Arc::new(RwLock::new(HashMap::new())),
             auth_token,
         }
@@ -441,19 +445,24 @@ async fn submit_message_handler(
         .with_trace(&user_turn.id),
     );
 
-    let worker_state = state.clone();
+    let worker_agent = state.agent.clone();
     let worker_session_id = session_id.clone();
     let worker_task_id = task.id.clone();
-    let worker_trace_id = user_turn.id.clone();
+    let worker_text = payload.text.clone();
+    let worker_cancellations = state.active_cancellations.clone();
+    let token_clone = cancel_token.clone();
+
     tokio::spawn(async move {
-        process_conversation(
-            worker_state,
-            worker_session_id,
-            worker_task_id,
-            worker_trace_id,
-            cancel_token,
-        )
-        .await;
+        let _ = worker_agent
+            .execute_objective(
+                &worker_session_id,
+                &worker_task_id,
+                &worker_text,
+                token_clone,
+            )
+            .await;
+        let mut map = worker_cancellations.write().await;
+        map.remove(&worker_session_id);
     });
 
     Ok((
@@ -464,193 +473,6 @@ async fn submit_message_handler(
             "accepted_at": user_turn.created_at
         })),
     ))
-}
-
-async fn process_conversation(
-    state: AppState,
-    session_id: String,
-    task_id: String,
-    trace_id: String,
-    cancel_token: CancellationToken,
-) {
-    info!(task_id = %task_id, session_id = %session_id, "Starting conversation processing");
-
-    let _ = state.storage.update_task_state(&task_id, "executing", None).await;
-
-    let turns = match state.storage.list_turns(&session_id).await {
-        Ok(t) => t,
-        Err(e) => {
-            warn!("Failed to fetch turns for session {session_id}: {e}");
-            let _ = state.storage.update_task_state(&task_id, "failed", Some(&e.to_string())).await;
-            return;
-        }
-    };
-
-    let mut messages = Vec::new();
-    messages.push(ChatMessage::system(
-        "You are EDITH, an advanced AI personal assistant. Be concise, precise, helpful, and direct.",
-    ));
-    for turn in turns {
-        match turn.role.as_str() {
-            "user" => messages.push(ChatMessage::user(turn.content)),
-            "assistant" => messages.push(ChatMessage::assistant(turn.content)),
-            "system" => messages.push(ChatMessage::system(turn.content)),
-            _ => messages.push(ChatMessage::user(turn.content)),
-        }
-    }
-
-    let (provider, model_name) = {
-        let all_providers = state.models.list().await;
-        if all_providers.iter().any(|(id, _)| id == "ollama") {
-            (state.models.get("ollama").await, "qwen3:0.6b".to_string())
-        } else if all_providers.iter().any(|(id, _)| id == "mock") {
-            (state.models.get("mock").await, "mock-model".to_string())
-        } else if let Some((first_id, _)) = all_providers.first() {
-            (state.models.get(first_id).await, "default".to_string())
-        } else {
-            (None, "none".to_string())
-        }
-    };
-
-    let provider = match provider {
-        Some(p) => p,
-        None => {
-            warn!("No model provider available to handle conversation");
-            let _ = state
-                .storage
-                .update_task_state(&task_id, "failed", Some("No model provider available"))
-                .await;
-            return;
-        }
-    };
-
-    let request = ModelRequest::new(model_name, messages).with_stream(true);
-
-    let mut stream = match provider.complete_stream(request).await {
-        Ok(s) => s,
-        Err(e) => {
-            warn!("Failed to initiate completion stream: {e}");
-            let _ = state
-                .storage
-                .update_task_state(&task_id, "failed", Some(&e.to_string()))
-                .await;
-            return;
-        }
-    };
-
-    let mut content_accum = String::new();
-    let mut thinking_accum = String::new();
-    let mut was_cancelled = false;
-
-    loop {
-        tokio::select! {
-            _ = cancel_token.cancelled() => {
-                info!(task_id = %task_id, "Conversation generation cancelled by user");
-                was_cancelled = true;
-                break;
-            }
-            item = stream.next() => {
-                match item {
-                    Some(Ok(chunk)) => {
-                        content_accum.push_str(&chunk.delta);
-                        if let Some(ref t) = chunk.thinking_delta {
-                            thinking_accum.push_str(t);
-                        }
-
-                        state.event_bus.publish(
-                            EventEnvelope::new(
-                                "message.delta",
-                                serde_json::json!({
-                                    "session_id": session_id,
-                                    "delta": chunk.delta,
-                                    "thinking_delta": chunk.thinking_delta,
-                                }),
-                            )
-                            .with_task(&task_id)
-                            .with_trace(&trace_id),
-                        );
-                    }
-                    Some(Err(e)) => {
-                        warn!("Error chunk from stream: {e}");
-                        let _ = state
-                            .storage
-                            .update_task_state(&task_id, "failed", Some(&e.to_string()))
-                            .await;
-                        let mut map = state.active_cancellations.write().await;
-                        map.remove(&session_id);
-                        return;
-                    }
-                    None => {
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    {
-        let mut map = state.active_cancellations.write().await;
-        map.remove(&session_id);
-    }
-
-    if was_cancelled {
-        let _ = state
-            .storage
-            .update_task_state(&task_id, "cancelled", Some("Cancelled by user"))
-            .await;
-        state.event_bus.publish(
-            EventEnvelope::new(
-                "generation.cancelled",
-                serde_json::json!({
-                    "session_id": session_id,
-                    "task_id": task_id,
-                }),
-            )
-            .with_task(&task_id)
-            .with_trace(&trace_id),
-        );
-        return;
-    }
-
-    let thinking_opt = if thinking_accum.trim().is_empty() {
-        None
-    } else {
-        Some(thinking_accum.as_str())
-    };
-
-    let assistant_turn = state
-        .storage
-        .append_turn(&session_id, "assistant", &content_accum, thinking_opt, None)
-        .await;
-
-    match assistant_turn {
-        Ok(turn) => {
-            let _ = state
-                .storage
-                .update_task_state(&task_id, "completed", Some("completed"))
-                .await;
-            state.event_bus.publish(
-                EventEnvelope::new(
-                    "message.final",
-                    serde_json::json!({
-                        "session_id": session_id,
-                        "turn_id": turn.id,
-                        "content": content_accum,
-                        "thinking": thinking_opt,
-                    }),
-                )
-                .with_task(&task_id)
-                .with_trace(&trace_id),
-            );
-        }
-        Err(e) => {
-            warn!("Failed to persist assistant turn: {e}");
-            let _ = state
-                .storage
-                .update_task_state(&task_id, "failed", Some(&e.to_string()))
-                .await;
-        }
-    }
 }
 
 async fn list_tasks_handler(

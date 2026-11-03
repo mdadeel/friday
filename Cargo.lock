@@ -246,11 +246,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "edith-agent"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "edith-core",
+ "edith-events",
+ "edith-models",
+ "edith-storage",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "edith-api"
 version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
+ "edith-agent",
  "edith-core",
  "edith-events",
  "edith-models",
