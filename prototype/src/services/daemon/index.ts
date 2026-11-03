@@ -17,8 +17,6 @@ export interface DaemonOptions {
  * Creates live services connected directly to the EDITH 2.0 Rust daemon.
  */
 export function createDaemonServices(options: DaemonOptions = {}): Services {
-  const baseUrl = options.baseUrl || 'http://127.0.0.1:4242';
-  const wsUrl = options.wsUrl || 'ws://127.0.0.1:4242/v1/events';
   const token =
     options.token ||
     (typeof window !== 'undefined'
@@ -26,6 +24,11 @@ export function createDaemonServices(options: DaemonOptions = {}): Services {
         localStorage.getItem('edith_token') ||
         'edith-local-token'
       : 'edith-local-token');
+
+  const baseUrl = options.baseUrl || 'http://127.0.0.1:4242';
+  const wsUrl =
+    options.wsUrl ||
+    `ws://127.0.0.1:4242/v1/events?token=${encodeURIComponent(token)}`;
 
   const client = new DaemonClient({ baseUrl, wsUrl, token });
   client.connectWs();

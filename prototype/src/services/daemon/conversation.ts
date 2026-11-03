@@ -10,7 +10,7 @@ export function createDaemonConversationService(client: DaemonClient): Conversat
       role: 'edith',
       kind: 'text',
       text: 'EDITH 2.0 connected to native daemon. All 11 registered tools, search, memory, and desktop subsystems are live.',
-      at: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      at: new Date().toISOString(),
       source: 'text',
       simulated: false,
     },
@@ -38,9 +38,11 @@ export function createDaemonConversationService(client: DaemonClient): Conversat
 
   // Subscribe to live WebSocket events from daemon
   client.onEvent((envelope: any) => {
-    if (!envelope || !envelope.topic) return;
+    if (!envelope) return;
+    const kind = envelope.kind || envelope.topic;
+    if (!kind) return;
 
-    if (envelope.topic === 'message.delta') {
+    if (kind === 'message.delta') {
       const delta = envelope.payload?.delta || '';
       if (currentStreamingMsgId && delta) {
         store.set((msgs) =>
@@ -51,8 +53,8 @@ export function createDaemonConversationService(client: DaemonClient): Conversat
           )
         );
       }
-    } else if (envelope.topic === 'message.final') {
-      const finalText = envelope.payload?.text || '';
+    } else if (kind === 'message.final') {
+      const finalText = envelope.payload?.content || envelope.payload?.text || '';
       if (currentStreamingMsgId) {
         store.set((msgs) =>
           msgs.map((m) =>
@@ -72,7 +74,7 @@ export function createDaemonConversationService(client: DaemonClient): Conversat
 
     async send(text: string, source: 'text' | 'voice' = 'text') {
       const userMsgId = `msg-user-${Date.now()}`;
-      const nowStr = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const nowStr = new Date().toISOString();
 
       const userMsg: ChatMessage = {
         id: userMsgId,
@@ -101,21 +103,43 @@ export function createDaemonConversationService(client: DaemonClient): Conversat
 
       try {
         const sessionId = await ensureSession();
-        const res = await client.postJson<{
-          turn: { content: string };
-          thinking?: string;
+        await client.postJson<{
+          turn_id: string;
+          task_id: string;
         }>(`/v1/sessions/${sessionId}/messages`, {
-          content: text,
-          origin: source,
+          text,
+          source,
         });
 
-        store.set((msgs) =>
-          msgs.map((m) =>
-            m.id === assistantMsgId
-              ? { ...m, text: res.turn?.content || m.text, streaming: false }
-              : m
-          )
-        );
+        // Polling fallback to guarantee completion if WebSocket lagged or missed
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 250));
+          const current = store.get().find((m) => m.id === assistantMsgId);
+          if (current && !current.streaming && current.text.trim()) {
+            break;
+          }
+
+          try {
+            const turns = await client.getJson<
+              Array<{ id: string; role: string; content: string }>
+            >(`/v1/sessions/${sessionId}/turns`);
+            const lastAssistant = [...turns]
+              .reverse()
+              .find((t) => t.role === 'assistant');
+            if (lastAssistant && lastAssistant.content) {
+              store.set((msgs) =>
+                msgs.map((m) =>
+                  m.id === assistantMsgId
+                    ? { ...m, text: lastAssistant.content, streaming: false }
+                    : m
+                )
+              );
+              break;
+            }
+          } catch {
+            // continue polling
+          }
+        }
       } catch (err: any) {
         store.set((msgs) =>
           msgs.map((m) =>

@@ -152,8 +152,9 @@ pub struct UpdateTurnRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubmitMessageRequest {
+    #[serde(alias = "content")]
     pub text: String,
-    #[serde(default = "default_source")]
+    #[serde(default = "default_source", alias = "origin")]
     pub source: String,
     pub client_turn_id: Option<String>,
 }
@@ -301,12 +302,31 @@ async fn auth_middleware(
     next: Next,
 ) -> Result<Response, StatusCode> {
     if let Some(ref token) = required_token {
+        // 1. Authorization: Bearer <token>
         if let Some(auth_header) = headers.get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 if let Some(bearer) = auth_str.strip_prefix("Bearer ") {
                     if bearer == token {
                         return Ok(next.run(req).await);
                     }
+                }
+            }
+        }
+        // 2. Query param ?token=<token> (essential for browser WebSockets)
+        if let Some(query) = req.uri().query() {
+            for param in query.split('&') {
+                if let Some((k, v)) = param.split_once('=') {
+                    if k == "token" && v == token {
+                        return Ok(next.run(req).await);
+                    }
+                }
+            }
+        }
+        // 3. Sec-WebSocket-Protocol header
+        if let Some(proto) = headers.get("Sec-WebSocket-Protocol") {
+            if let Ok(p_str) = proto.to_str() {
+                if p_str.split(',').any(|part| part.trim() == token) {
+                    return Ok(next.run(req).await);
                 }
             }
         }
