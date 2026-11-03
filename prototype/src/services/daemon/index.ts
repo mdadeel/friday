@@ -19,7 +19,13 @@ export interface DaemonOptions {
 export function createDaemonServices(options: DaemonOptions = {}): Services {
   const baseUrl = options.baseUrl || 'http://127.0.0.1:4242';
   const wsUrl = options.wsUrl || 'ws://127.0.0.1:4242/v1/events';
-  const token = options.token;
+  const token =
+    options.token ||
+    (typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('token') ||
+        localStorage.getItem('edith_token') ||
+        'edith-local-token'
+      : 'edith-local-token');
 
   const client = new DaemonClient({ baseUrl, wsUrl, token });
   client.connectWs();

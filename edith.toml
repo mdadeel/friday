@@ -11,6 +11,9 @@ tcp_port = 4242
 # Transport mode: "both" (Unix socket + TCP), "unix", or "tcp"
 transport = "both"
 
+# Local authentication token
+auth_token = "edith-local-token"
+
 [storage]
 # Local SQLite database file path
 database_path = "data/edith.db"

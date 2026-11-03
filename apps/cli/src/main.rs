@@ -99,11 +99,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Post message
             let mut req = client.post(format!("{base_url}/v1/sessions/{session_id}/messages"))
-                .json(&serde_json::json!({"content": msg, "origin": "text"}));
+                .json(&serde_json::json!({"text": msg, "source": "text"}));
             if let Some(ref t) = token { req = req.bearer_auth(t); }
-            let res = req.send().await?;
-            let val: Value = res.json().await?;
-            println!("\nEDITH: {}", val["turn"]["content"].as_str().unwrap_or(""));
+            let _res = req.send().await?;
+
+            // Poll for assistant response
+            print!("Thinking");
+            let mut reply = String::new();
+            for _ in 0..30 {
+                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+                print!(".");
+                use std::io::Write;
+                let _ = std::io::stdout().flush();
+
+                let mut req = client.get(format!("{base_url}/v1/sessions/{session_id}/turns"));
+                if let Some(ref t) = token { req = req.bearer_auth(t); }
+                if let Ok(res) = req.send().await {
+                    if let Ok(turns) = res.json::<Vec<Value>>().await {
+                        if let Some(last) = turns.iter().rev().find(|t| t["role"] == "assistant") {
+                            if let Some(c) = last["content"].as_str() {
+                                reply = c.to_string();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            println!("\n\nEDITH: {}", reply);
         }
         _ => {
             println!("EDITH 2.0 CLI");
