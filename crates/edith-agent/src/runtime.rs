@@ -4,7 +4,8 @@ use crate::plan::{Plan, PlanStep};
 use crate::state_machine::TaskStateMachine;
 use edith_core::{EdithError, TaskState, VerificationMode};
 use edith_events::{EventBus, EventEnvelope};
-use edith_models::{ChatMessage, ModelRequest, ProviderRegistry};
+use edith_models::{ChatMessage, ModelProvider, ModelRequest, ProviderRegistry};
+use edith_router::{ModelRouter, RouteDecision};
 use edith_storage::Storage;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -27,16 +28,19 @@ pub struct AgentRuntime {
     storage: Storage,
     event_bus: EventBus,
     models: ProviderRegistry,
+    router: Arc<ModelRouter>,
     executor: Arc<ExecutionEngine>,
 }
 
 impl AgentRuntime {
     pub fn new(storage: Storage, event_bus: EventBus, models: ProviderRegistry) -> Self {
         let executor = Arc::new(ExecutionEngine::new(event_bus.clone()));
+        let router = Arc::new(ModelRouter::new(storage.clone(), event_bus.clone(), models.clone()));
         Self {
             storage,
             event_bus,
             models,
+            router,
             executor,
         }
     }
@@ -45,7 +49,11 @@ impl AgentRuntime {
         self.executor.clone()
     }
 
-    /// Orchestrates an incoming user objective from planning through execution and verification.
+    pub fn router(&self) -> Arc<ModelRouter> {
+        self.router.clone()
+    }
+
+    /// Orchestrates an incoming user objective from routing/planning through execution and verification.
     pub async fn execute_objective(
         &self,
         session_id: &str,
@@ -72,10 +80,59 @@ impl AgentRuntime {
         let context_builder = ContextBuilder::new();
         let messages = context_builder.build(&turns);
 
-        // 3. Model selection
-        let (provider, model_name) = self.select_model().await?;
+        // 3. Routing decision (Tier 0 heuristic or model selection)
+        let route_decision = self.router.route(task_id, objective, turns.len()).await?;
 
-        // 4. Check for cancellation
+        // 4. Check Tier 0 instant resolution
+        if route_decision.is_tier0() {
+            let answer = route_decision.tier0_result.unwrap_or_default();
+
+            TaskStateMachine::can_transition(
+                TaskState::Planning,
+                TaskState::Executing,
+                VerificationMode::NoneDeclared,
+                false,
+            )?;
+            TaskStateMachine::can_transition(
+                TaskState::Executing,
+                TaskState::Completed,
+                VerificationMode::NoneDeclared,
+                true,
+            )?;
+
+            self.storage
+                .update_task_state(task_id, "completed", Some("completed"))
+                .await?;
+            self.publish_task_event(task_id, "task.state_changed", "completed", session_id);
+
+            let turn = self
+                .storage
+                .append_turn(session_id, "assistant", &answer, None, Some(&route_decision.id))
+                .await?;
+
+            self.event_bus.publish(
+                EventEnvelope::new(
+                    "message.final",
+                    serde_json::json!({
+                        "session_id": session_id,
+                        "turn_id": turn.id,
+                        "content": answer,
+                        "tier": "T0",
+                    }),
+                )
+                .with_task(task_id),
+            );
+
+            return Ok(AgentExecutionResult {
+                task_id: task_id.to_string(),
+                final_state: TaskState::Completed,
+                response: answer,
+                thinking: None,
+                steps_executed: 0,
+            });
+        }
+
+        // 5. Check for cancellation
         if cancel_token.is_cancelled() {
             self.handle_cancellation(task_id, session_id).await?;
             return Ok(AgentExecutionResult {
@@ -87,7 +144,7 @@ impl AgentRuntime {
             });
         }
 
-        // 5. Determine whether objective requires a multi-step plan
+        // 6. Determine whether objective requires a multi-step plan
         let is_complex_task = objective.to_lowercase().contains("plan")
             || objective.to_lowercase().contains("steps")
             || objective.to_lowercase().contains("build");
@@ -95,8 +152,8 @@ impl AgentRuntime {
         if is_complex_task {
             self.execute_complex_plan(session_id, task_id, objective, cancel_token).await
         } else {
-            // Conversational direct execution
-            self.execute_conversational(session_id, task_id, provider, model_name, messages, cancel_token).await
+            // Conversational direct execution with chosen route
+            self.execute_conversational(session_id, task_id, &route_decision, messages, cancel_token).await
         }
     }
 
@@ -201,8 +258,7 @@ impl AgentRuntime {
         &self,
         session_id: &str,
         task_id: &str,
-        provider: Arc<dyn edith_models::ModelProvider>,
-        model_name: String,
+        route_decision: &RouteDecision,
         messages: Vec<ChatMessage>,
         cancel_token: CancellationToken,
     ) -> Result<AgentExecutionResult, EdithError> {
@@ -217,6 +273,9 @@ impl AgentRuntime {
             .update_task_state(task_id, "executing", None)
             .await?;
         self.publish_task_event(task_id, "task.state_changed", "executing", session_id);
+
+        // Resolve model provider based on route decision and fallback chain
+        let (provider, model_name) = self.resolve_provider(route_decision).await?;
 
         let request = ModelRequest::new(model_name, messages).with_stream(true);
         let mut stream = provider
@@ -297,7 +356,13 @@ impl AgentRuntime {
 
         let assistant_turn = self
             .storage
-            .append_turn(session_id, "assistant", &content_accum, thinking_opt, None)
+            .append_turn(
+                session_id,
+                "assistant",
+                &content_accum,
+                thinking_opt,
+                Some(&route_decision.id),
+            )
             .await?;
 
         self.event_bus.publish(
@@ -308,6 +373,7 @@ impl AgentRuntime {
                     "turn_id": assistant_turn.id,
                     "content": content_accum,
                     "thinking": thinking_opt,
+                    "route_id": route_decision.id,
                 }),
             )
             .with_task(task_id),
@@ -320,6 +386,33 @@ impl AgentRuntime {
             thinking: thinking_opt.map(|s| s.to_string()),
             steps_executed: 1,
         })
+    }
+
+    async fn resolve_provider(
+        &self,
+        route_decision: &RouteDecision,
+    ) -> Result<(Arc<dyn ModelProvider>, String), EdithError> {
+        // Try primary provider
+        if let Some(p) = self.models.get(&route_decision.provider_id).await {
+            return Ok((p, route_decision.primary_model.clone()));
+        }
+
+        // Try fallbacks
+        for (provider_id, model_name) in &route_decision.fallback_chain {
+            if let Some(p) = self.models.get(provider_id).await {
+                return Ok((p, model_name.clone()));
+            }
+        }
+
+        // Ultimate fallback: first available provider in registry
+        let list = self.models.list().await;
+        if let Some((first_id, _)) = list.first() {
+            if let Some(p) = self.models.get(first_id).await {
+                return Ok((p, "default".to_string()));
+            }
+        }
+
+        Err(EdithError::Agent("No model provider available in registry".to_string()))
     }
 
     async fn handle_cancellation(&self, task_id: &str, session_id: &str) -> Result<(), EdithError> {
@@ -342,18 +435,5 @@ impl AgentRuntime {
             )
             .with_task(task_id),
         );
-    }
-
-    async fn select_model(&self) -> Result<(Arc<dyn edith_models::ModelProvider>, String), EdithError> {
-        let all_providers = self.models.list().await;
-        if all_providers.iter().any(|(id, _)| id == "ollama") {
-            Ok((self.models.get("ollama").await.unwrap(), "qwen3:0.6b".to_string()))
-        } else if all_providers.iter().any(|(id, _)| id == "mock") {
-            Ok((self.models.get("mock").await.unwrap(), "mock-model".to_string()))
-        } else if let Some((first_id, _)) = all_providers.first() {
-            Ok((self.models.get(first_id).await.unwrap(), "default".to_string()))
-        } else {
-            Err(EdithError::Agent("No model provider registered".to_string()))
-        }
     }
 }

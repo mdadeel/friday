@@ -1,5 +1,28 @@
 # EDITH 2.0 — Engineering Changelog
 
+## [0.5.0] - 2026-11-03
+
+### Phase 5: Intelligent Model Routing
+- Created crate [`crates/edith-router`](crates/edith-router):
+  - Implemented `Tier0Matcher` (`tier0.rs`):
+    - Instant 0-token deterministic pattern matching for time, date, system health status, and arithmetic expressions (e.g. `(25 + 75) * 4`).
+    - Eliminates model latency and token costs for basic queries, returning 100% deterministic results with zero hallucination.
+  - Implemented `ComplexityClassifier` (`classifier.rs`):
+    - Multi-tier complexity classification across Tier 1 (fast local models e.g. `qwen3:0.6b`), Tier 2 (reasoning local models e.g. `qwen3:4b`), Tier 3 (workhorse cloud e.g. Claude 3.5 Sonnet / Gemini 1.5 Pro), and Tier 4 (deep frontier reasoning).
+  - Implemented `RouteDecision` (`decision.rs`) and `ModelRouter` (`router.rs`):
+    - Selects optimal provider and model tier with fallback chains.
+    - Automatically records routing audit logs into SQLite `route_decisions` table with execution tier, provider, model name, and routing rationale.
+- Integrated `ModelRouter` into `edith-agent`:
+  - `AgentRuntime` now routes all user objectives through `ModelRouter`.
+  - When Tier 0 matches, immediately returns deterministic answer and completes task without invoking an LLM.
+  - When non-Tier 0, selects primary provider with fallback chain and records routing decision.
+- Verification & Testing:
+  - 11 unit tests added in `crates/edith-router`.
+  - Full workspace test suite passes (37 tests total).
+  - Live daemon tests verified: math calculation `(25 + 75) * 4 = 400` and current time queries executed with 0 tokens and audit trail recorded.
+
+---
+
 ## [0.4.0] - 2026-11-03
 
 ### Phase 4: Agent Runtime & Orchestration

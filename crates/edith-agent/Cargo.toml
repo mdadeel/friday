@@ -9,6 +9,7 @@ edith-core.workspace = true
 edith-events.workspace = true
 edith-storage.workspace = true
 edith-models.workspace = true
+edith-router.workspace = true
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true

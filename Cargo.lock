@@ -254,6 +254,7 @@ dependencies = [
  "edith-core",
  "edith-events",
  "edith-models",
+ "edith-router",
  "edith-storage",
  "futures-util",
  "serde",
@@ -346,6 +347,25 @@ dependencies = [
  "edith-core",
  "futures-util",
  "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "edith-router"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "edith-core",
+ "edith-events",
+ "edith-models",
+ "edith-storage",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",
@@ -1239,6 +1259,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "580c875845b41ecb1564ad1ae4703044cef774145e3d7a94dc2b3fa7c97868fd"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "regex"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
 ]
 
 [[package]]

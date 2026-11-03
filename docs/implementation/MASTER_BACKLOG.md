@@ -52,7 +52,19 @@
 
 | Task ID | Component | Description | Status | Verification Criteria |
 |---------|-----------|-------------|--------|-----------------------|
-| **TSK-501** | `edith-router` | Deterministic Tier 0 matcher (local system time, date, math, status without model) | Planned | Unit tests pass on deterministic patterns |
-| **TSK-502** | `edith-router` | Complexity classifier mapping objectives to Tiers (T0-T4) | Planned | Benchmark routing tests match Arena specs |
-| **TSK-503** | `edith-router` | Fallback escalation chain (T1 fast local -> T2 reasoning local -> T3/T4 cloud) | Planned | Provider outage escalates to fallback model |
-| **TSK-504** | `edith-router` | Audit route decision persistence in `route_decisions` table | Planned | SQLite audit record verified |
+| **TSK-501** | `edith-router` | Deterministic Tier 0 matcher (local system time, date, math, status without model) | **Completed** | Unit tests pass on deterministic patterns |
+| **TSK-502** | `edith-router` | Complexity classifier mapping objectives to Tiers (T0-T4) | **Completed** | Benchmark routing tests match Arena specs |
+| **TSK-503** | `edith-router` | Fallback escalation chain (T1 fast local -> T2 reasoning local -> T3/T4 cloud) | **Completed** | Fallback chain generation verified |
+| **TSK-504** | `edith-router` | Audit route decision persistence in `route_decisions` table | **Completed** | SQLite audit record verified |
+
+---
+
+## Epic 6: Tool & MCP Infrastructure (Phase 6)
+
+| Task ID | Component | Description | Status | Verification Criteria |
+|---------|-----------|-------------|--------|-----------------------|
+| **TSK-601** | `edith-tools` | Unified `Tool` trait, parameters schema validation, permissions model, execution result types | Planned | Trait and schema unit tests pass |
+| **TSK-602** | `edith-tools` | Core native built-in tools: `fs.read_file`, `fs.write_file`, `fs.list_dir`, `system.execute_command`, `datetime.now` | Planned | Sandboxed execution & path containment tests pass |
+| **TSK-603** | `edith-tools` | Tool registry: thread-safe registration, discovery, schema export for LLM function calling | Planned | Registry resolution & schema export tests pass |
+| **TSK-604** | `edith-mcp` | Model Context Protocol (MCP) client connecting via stdio JSON-RPC | Planned | MCP client connects, lists tools, calls tools |
+| **TSK-605** | `edith-agent` | Wire Tool Registry into `ExecutionEngine`, replacing step mock dispatch with real tool invocation | Planned | Live plan executes real filesystem/command tool steps |

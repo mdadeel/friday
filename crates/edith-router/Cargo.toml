@@ -1,0 +1,22 @@
+[package]
+name = "edith-router"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+edith-core.workspace = true
+edith-events.workspace = true
+edith-storage.workspace = true
+edith-models.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

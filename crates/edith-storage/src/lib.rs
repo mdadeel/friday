@@ -45,6 +45,22 @@ pub struct TaskEventRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouteDecisionRecord {
+    pub id: String,
+    pub task_id: String,
+    pub subtask_id: Option<String>,
+    pub tier: String,
+    pub provider: String,
+    pub model: Option<String>,
+    pub data_class: String,
+    pub reason: String,
+    pub fallbacks: String,
+    pub latency_json: Option<String>,
+    pub outcome: String,
+    pub at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionRecord {
     pub id: String,
     pub title: String,
@@ -669,6 +685,107 @@ impl Storage {
                 at: now,
                 trace_id,
             })
+        })
+        .await
+        .map_err(|e| EdithError::Internal(e.to_string()))?
+    }
+
+    // --- Route Decisions Repository ---
+
+    pub async fn record_route_decision(
+        &self,
+        task_id: &str,
+        subtask_id: Option<&str>,
+        tier: &str,
+        provider: &str,
+        model: Option<&str>,
+        data_class: &str,
+        reason: &str,
+        fallbacks: &str,
+        outcome: &str,
+    ) -> Result<RouteDecisionRecord> {
+        let pool = self.pool.clone();
+        let id = Id::new().to_string();
+        let task_id = task_id.to_string();
+        let subtask_id = subtask_id.map(|s| s.to_string());
+        let tier = tier.to_string();
+        let provider = provider.to_string();
+        let model = model.map(|s| s.to_string());
+        let data_class = data_class.to_string();
+        let reason = reason.to_string();
+        let fallbacks = fallbacks.to_string();
+        let outcome = outcome.to_string();
+        let now = Utc::now().to_rfc3339();
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool
+                .get()
+                .map_err(|e| EdithError::Storage(format!("Pool error: {e}")))?;
+            conn.execute(
+                "INSERT INTO route_decisions (id, task_id, subtask_id, tier, provider, model, data_class, reason, fallbacks, latency_json, outcome, at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, '{}', ?10, ?11)",
+                params![id, task_id, subtask_id, tier, provider, model, data_class, reason, fallbacks, outcome, now],
+            )
+            .map_err(|e| EdithError::Storage(format!("Insert route_decision error: {e}")))?;
+
+            Ok(RouteDecisionRecord {
+                id,
+                task_id,
+                subtask_id,
+                tier,
+                provider,
+                model,
+                data_class,
+                reason,
+                fallbacks,
+                latency_json: Some("{}".to_string()),
+                outcome,
+                at: now,
+            })
+        })
+        .await
+        .map_err(|e| EdithError::Internal(e.to_string()))?
+    }
+
+    pub async fn list_route_decisions(&self, task_id: &str) -> Result<Vec<RouteDecisionRecord>> {
+        let pool = self.pool.clone();
+        let task_id = task_id.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool
+                .get()
+                .map_err(|e| EdithError::Storage(format!("Pool error: {e}")))?;
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, task_id, subtask_id, tier, provider, model, data_class, reason, fallbacks, latency_json, outcome, at
+                     FROM route_decisions WHERE task_id = ?1 ORDER BY at ASC",
+                )
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+
+            let rows = stmt
+                .query_map(params![task_id], |row| {
+                    Ok(RouteDecisionRecord {
+                        id: row.get(0)?,
+                        task_id: row.get(1)?,
+                        subtask_id: row.get(2)?,
+                        tier: row.get(3)?,
+                        provider: row.get(4)?,
+                        model: row.get(5)?,
+                        data_class: row.get(6)?,
+                        reason: row.get(7)?,
+                        fallbacks: row.get(8)?,
+                        latency_json: row.get(9)?,
+                        outcome: row.get(10)?,
+                        at: row.get(11)?,
+                    })
+                })
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+
+            let mut list = Vec::new();
+            for r in rows {
+                list.push(r.map_err(|e| EdithError::Storage(e.to_string()))?);
+            }
+            Ok(list)
         })
         .await
         .map_err(|e| EdithError::Internal(e.to_string()))?

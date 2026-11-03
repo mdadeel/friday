@@ -6,6 +6,7 @@ members = [
     "crates/edith-storage",
     "crates/edith-models",
     "crates/edith-agent",
+    "crates/edith-router",
     "crates/edith-api",
     "apps/daemon",
 ]
@@ -22,6 +23,7 @@ edith-events = { path = "crates/edith-events" }
 edith-storage = { path = "crates/edith-storage" }
 edith-models = { path = "crates/edith-models" }
 edith-agent = { path = "crates/edith-agent" }
+edith-router = { path = "crates/edith-router" }
 edith-api = { path = "crates/edith-api" }
 
 async-trait = { version = "0.1" }
@@ -46,3 +48,4 @@ tempfile = { version = "3.14" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
 hyper-util = { version = "0.1", features = ["tokio", "server-auto", "service"] }
 tokio-util = { version = "0.7" }
+regex = { version = "1.11" }

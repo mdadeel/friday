@@ -44,6 +44,18 @@
     - `executor::tests::test_execution_engine_cancellation`: PASSED (Cancellation skips remaining pending steps)
     - `tests::test_agent_runtime_conversational_execution`: PASSED (End-to-end conversational objective execution)
     - `tests::test_agent_runtime_complex_plan_execution`: PASSED (End-to-end multi-step plan generation, execution, and verification)
+  - `edith-router`:
+    - `classifier::tests::test_tier1_fast_local_classification`: PASSED (Short conversational requests classified as T1)
+    - `classifier::tests::test_tier2_reasoning_local_classification`: PASSED (Multi-step coding & analysis classified as T2)
+    - `classifier::tests::test_tier3_workhorse_cloud_classification`: PASSED (Deep refactor & architecture tasks classified as T3)
+    - `classifier::tests::test_tier4_frontier_cloud_classification`: PASSED (Frontier/synthesis tasks classified as T4)
+    - `tier0::tests::test_tier0_time_and_date`: PASSED (Current time and date regex matcher)
+    - `tier0::tests::test_tier0_status`: PASSED (Deterministic system health status)
+    - `tier0::tests::test_tier0_math`: PASSED (Arithmetic parser and calculator)
+    - `tier0::tests::test_non_tier0_passes_through`: PASSED (Non-trivial queries pass through to model router)
+    - `tests::test_model_router_tier0_math`: PASSED (Router completes T0 math with 0 tokens and audit trail)
+    - `tests::test_model_router_tier1_fast_local`: PASSED (Routes simple chat to fast local adapter)
+    - `tests::test_model_router_tier2_reasoning_local`: PASSED (Routes reasoning tasks to reasoning local adapter)
   - `edith-api`:
     - `tests::test_health_endpoint`: PASSED (`GET /v1/health` returns status healthy & subsystems)
     - `tests::test_auth_middleware_blocks_unauthorized`: PASSED (Rejects missing bearer token with 401)
@@ -64,3 +76,10 @@
       - Executed 2-step plan with dependency resolution.
       - Generated assistant turn: `"Successfully completed multi-step plan for 'Plan and build the steps for service deployment' (2 steps executed)."`
       - Task finished at `2026-11-03T06:49:07.410815568+00:00` with state `completed`.
+  - **Deterministic Tier 0 Routing & Math (Phase 5)**:
+    - User message: `"calculate (25 + 75) * 4"`
+    - Result: `"(25 + 75) * 4 = 400"` returned instantaneously (0 tokens consumed, 0 ms model latency).
+    - Audit trail: `route_decisions` table recorded decision with `selected_tier = "tier0"`, `route_reason = "tier0_deterministic_arithmetic"`.
+  - **Deterministic Tier 0 Time & Date (Phase 5)**:
+    - User message: `"what time is it"`
+    - Result: `"The current local time is 12:57:50 (+06:00), and UTC time is 06:57:50 UTC."` returned instantaneously.
