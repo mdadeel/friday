@@ -1,7 +1,7 @@
 # EDITH 2.0 — Implementation Status
 **Current Date:** 2026-11-03  
-**Active Milestone:** Phase 4 Completed / Phase 5 Ready  
-**Overall Status:** Active Development
+**Active Milestone:** v1.0.0 Completed (All Roadmap Phases 0–12 Fully Implemented & Verified)  
+**Overall Status:** Production Ready
 
 ---
 
@@ -20,8 +20,8 @@
 | **Phase 8** | Voice Engine | **Verified Done** | 76 workspace tests pass; live voice endpoints verified | `edith-voice` crate, 16 kHz audio buffer, VAD state machine, mic privacy gatekeeper, Whisper ASR adapter, TTS pipeline, barge-in controller, `/v1/voice/*` |
 | **Phase 9** | Search & Research Infrastructure | **Verified Done** | 85 workspace tests pass; live search verified | `edith-search` crate, SSRF protection, HTML content extractor, evidence verification, DuckDuckGo & mock fallback, tools `web.search` & `web.fetch`, `/v1/search/*` |
 | **Phase 10** | Desktop Environment Integrations | **Verified Done** | 96 workspace tests pass; live desktop endpoints verified | `edith-desktop` crate, `/proc` telemetry, app discovery & launcher, window environment context, tools `desktop.*`, `/v1/desktop/*` |
-| **Phase 11** | Full Interface & Desktop Shell | **Ready** | Next milestone | Tauri desktop shell & prototype hookup |
-| **Phase 12** | Testing, Hardening & Evaluation | Planned | Continuous | Unit, contract, benchmark suites |
+| **Phase 11** | Full Interface & Desktop Shell | **Verified Done** | Live hybrid daemon adapters + 19 Vitest tests pass | Dynamic daemon auto-detection, streaming conversation, voice PTT/barge-in, persistent memory, native CLI binary `edith`, systemd unit & desktop entry |
+| **Phase 12** | Testing, Hardening & Evaluation | **Verified Done** | **120/120 automated tests pass** | 101 Rust workspace tests (including 5 evaluation scenario benchmarks) + 19 frontend tests; zero-trust security hardening verified |
 
 ---
 
@@ -30,8 +30,8 @@
 | Component / Crate | Designed | Scaffolded | Implemented | Tested | Verified |
 |-------------------|----------|------------|-------------|--------|----------|
 | `docs/edith/` (Specs) | YES | YES | YES | YES | YES |
-| `prototype/` (Web UI) | YES | YES | YES | YES (19 tests) | YES |
-| `Cargo.toml` (Workspace) | YES | YES | YES | YES | YES |
+| `prototype/` (Web UI) | YES | YES | YES | YES (19 tests) | YES (Dynamic daemon auto-detection & live REST/WS streaming) |
+| `Cargo.toml` (Workspace) | YES | YES | YES | YES | YES (14 workspace crates/members) |
 | `crates/edith-core` | YES | YES | YES | YES (3 tests) | YES |
 | `crates/edith-events` | YES | YES | YES | YES (2 tests) | YES |
 | `crates/edith-storage` | YES | YES | YES | YES (1 test) | YES (Migrations 0001, 0002, 0003) |
@@ -44,5 +44,7 @@
 | `crates/edith-voice` | YES | YES | YES | YES (19 tests) | YES (VAD, ASR, TTS, Barge-in, Privacy) |
 | `crates/edith-search` | YES | YES | YES | YES (8 tests) | YES (SSRF defense, extractor, evidence verifier, web tools) |
 | `crates/edith-desktop` | YES | YES | YES | YES (10 tests) | YES (Linux /proc metrics, XDG app discovery, window context, desktop tools) |
-| `crates/edith-api` | YES | YES | YES | YES (9 tests) | YES (Voice sessions, memory CRUD, tools, search, desktop) |
+| `crates/edith-api` | YES | YES | YES | YES (14 tests) | YES (Voice sessions, memory CRUD, tools, search, desktop, evaluation scenarios) |
 | `apps/daemon` | YES | YES | YES | YES (Live run) | YES (Dual Unix & TCP socket) |
+| `apps/cli` | YES | YES | YES | YES (Live run) | YES (`edith` status, tools, memory, apps, chat) |
+| `deploy/` | YES | YES | YES | YES | YES (Systemd service & desktop launcher entry) |

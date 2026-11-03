@@ -15,6 +15,7 @@ members = [
     "crates/edith-desktop",
     "crates/edith-api",
     "apps/daemon",
+    "apps/cli",
 ]
 
 [workspace.package]

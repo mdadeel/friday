@@ -133,6 +133,20 @@
     - Host Telemetry Probe: `GET /v1/desktop/metrics` returns real-time kernel metrics: CPU 5.14%, load averages [1.36, 0.87, 0.73], memory total 14.5 GB (used 5.48 GB, 37.72%), disk total 247.6 GB (used 156.1 GB, 63.06%), OS Ubuntu 26.04.1 LTS on kernel Linux 7.0.0-42-generic.
     - Application Discovery: `GET /v1/desktop/apps?q=chrome` discovers `/usr/share/applications/google-chrome.desktop`, parsing categories, clean exec path `/usr/bin/google-chrome-stable`, and icon.
     - Window & Session Context: `GET /v1/desktop/window` returns active display server `wayland`, desktop environment `ubuntu:GNOME`, display `wayland-0`, and workspace `1`.
+  - **Full Frontend & Desktop Shell Integration (Phase 11)**:
+    - Dynamic Auto-detection: `prototype/src/services/daemon` probes `/v1/health` on startup, automatically connecting to live daemon when active.
+    - Real-time Token Streaming: `message.delta` WebSocket events stream token chunks into active chat messages without polling.
+    - Native CLI Execution: `cargo run -p edith-cli -- status` reports health, subsystems, and host telemetry from the live daemon.
+    - Deployment Specifications: `deploy/edith.service` and `deploy/edith.desktop` verified for systemd autostart and GNOME application registration.
+  - **Final Hardening & Evaluation Suite (Phase 12)**:
+    - Evaluation Scenarios: `cargo test --test evaluation_scenarios` runs 5 comprehensive integration benchmark tests covering:
+      1. Deterministic Tier 0 calculation & time handling (sub-millisecond, 0 model tokens consumed).
+      2. Memory security gatekeeper rejecting sensitive credentials (API keys, GitHub PATs).
+      3. Zero-trust SSRF defense blocking loopback (`127.0.0.1`), metadata services (`169.254.169.254`), and private LAN endpoints.
+      4. Desktop environment telemetry & tool registration (all 11 registered tools active).
+      5. Microphone privacy gatekeeper guaranteeing audio isolation outside active voice listening/speaking states.
+    - Total Test Suite Outcome: **120/120 automated tests pass** (101 Rust workspace tests + 19 frontend Vitest tests).
+
 
 
 

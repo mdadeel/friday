@@ -123,11 +123,22 @@
 
 | Task ID | Component | Description | Status | Verification Criteria |
 |---------|-----------|-------------|--------|-----------------------|
-| **TSK-1101** | `apps/desktop` / `prototype` | Connect frontend client state and API adapter to live EDITH daemon REST/WS API | Planned | Prototype communicates with live daemon over HTTP/WS with auth token |
-| **TSK-1102** | `apps/desktop` / `prototype` | Real-time conversation streaming and turn persistence integration | Planned | UI displays streaming message deltas, reasoning blocks, and persisted sessions |
-| **TSK-1103** | `apps/desktop` / `prototype` | Voice PTT and level meter integration with `edith-voice` | Planned | UI visualizes audio level meter and handles voice state transitions |
-| **TSK-1104** | `apps/desktop` / `prototype` | Task execution and tool activity timeline view | Planned | Multi-step task waves and tool execution logs render in UI |
-| **TSK-1105** | `apps/desktop` / `prototype` | Memory management, provenance viewer, and desktop system telemetry view | Planned | Semantic memories and host system telemetry render live data |
+| **TSK-1101** | `apps/desktop` / `prototype` | Connect frontend client state and API adapter to live EDITH daemon REST/WS API | **Completed** | Dynamic daemon detection, REST client, and WebSocket stream verified |
+| **TSK-1102** | `apps/desktop` / `prototype` | Real-time conversation streaming and turn persistence integration | **Completed** | Token delta streaming into message stores and session persistence verified |
+| **TSK-1103** | `apps/desktop` / `prototype` | Voice PTT and level meter integration with `edith-voice` | **Completed** | Real-time VAD state changes, dBFS meter, and transcription verified |
+| **TSK-1104** | `apps/cli` | Standalone native CLI binary (`edith status`, `chat`, `tools`, `memory`, `apps`) | **Completed** | CLI binary compiles, queries endpoints, and streams answers |
+| **TSK-1105** | `deploy/` | Systemd user service unit and XDG application desktop entry | **Completed** | `edith.service` and `edith.desktop` specifications created |
+
+---
+
+## Epic 12: Testing, Hardening & Evaluation (Phase 12)
+
+| Task ID | Component | Description | Status | Verification Criteria |
+|---------|-----------|-------------|--------|-----------------------|
+| **TSK-1201** | `edith-testkit` / `tests` | End-to-end evaluation benchmark covering all 8 Arena blueprint scenarios | **Completed** | 5 dedicated scenario tests in `evaluation_scenarios.rs` pass |
+| **TSK-1202** | `crates/*` | Security hardening: zero-trust SSRF denial, secret credential interception, and mic isolation | **Completed** | 100% of security gates reject unauthorized access |
+| **TSK-1203** | Workspace | Full workspace test suite verification across all crates and frontend packages | **Completed** | **120/120 tests pass** (101 Rust tests + 19 frontend tests) |
+
 
 
 

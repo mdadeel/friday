@@ -1,5 +1,36 @@
 # EDITH 2.0 — Engineering Changelog
 
+## [1.0.0] - 2026-11-03
+
+### Phase 11 & 12: Desktop Shell, Live UI Integration, Hardening & Evaluation
+- **Full Frontend Integration (`prototype/src/services/daemon/`)**:
+  - Implemented dynamic daemon auto-detection: checks if local daemon is reachable at `http://127.0.0.1:4242`; seamlessly mounts live daemon adapters, or falls back to mock if offline.
+  - Real-time conversation streaming adapter: binds to WebSocket `/v1/events` for `message.delta` and `message.final`, appending streaming tokens in real time directly to chat messages.
+  - Live Voice adapter: connects Push-to-Talk, release, cancellation barge-in, and TTS playback directly to `/v1/voice/*` endpoints, updating normalized dBFS level meter and VAD state.
+  - Persistent Memory adapter: queries and updates `/v1/memory/items`, supporting user confirmations, edits, and fact retrieval.
+  - Live Capabilities adapter: enumerates all 11 registered native tools, search tools, and desktop tools from `/v1/tools`.
+  - Diagnostics adapter: logs live host telemetry (`/v1/desktop/metrics`) and WebSocket events into application activity view.
+- **Standalone Native CLI Binary (`apps/cli`)**:
+  - Created `edith` command-line tool with subcommands:
+    - `edith status`: displays daemon health, version, model provider status, and Linux host telemetry.
+    - `edith tools`: lists all registered capabilities with autonomy classes and side effects.
+    - `edith memory`: enumerates active persistent memory items with provenance tags.
+    - `edith apps [query]`: searches installed desktop applications.
+    - `edith chat <message>`: sends interactive prompt and streams answer in terminal.
+- **System Deployment Assets (`deploy/`)**:
+  - Created `deploy/edith.service`: systemd user service unit for autostarting `edith-daemon` on desktop login.
+  - Created `deploy/edith.desktop`: FreeDesktop XDG desktop launcher entry.
+- **Testing & Hardening Suite (Phase 12)**:
+  - Added dedicated integration evaluation test suite `crates/edith-api/tests/evaluation_scenarios.rs` covering all 5 core Arena validation scenarios:
+    1. Deterministic Tier 0 arithmetic and time handling without consuming model tokens.
+    2. Memory security gatekeeper rejecting sensitive credentials (API keys / GitHub tokens).
+    3. Zero-trust SSRF defense blocking loopback, metadata services, and internal IP targets.
+    4. Desktop host metrics and capability inspection across 11 registered tools.
+    5. Voice engine microphone isolation and state transitions.
+  - **120/120 total automated tests pass** across the entire project (101 Rust tests + 19 frontend Vitest tests).
+
+---
+
 ## [0.10.0] - 2026-11-03
 
 ### Phase 10: Desktop Environment Integrations

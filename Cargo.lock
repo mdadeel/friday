@@ -298,6 +298,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "edith-cli"
+version = "0.1.0"
+dependencies = [
+ "edith-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "edith-core"
 version = "0.1.0"
 dependencies = [

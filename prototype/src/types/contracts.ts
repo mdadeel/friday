@@ -29,7 +29,7 @@ export interface RouteInfo {
   latencyMs: number;
   category: string;
   outcome: 'ok' | 'fallback' | 'failed';
-  simulated: true;
+  simulated?: boolean;
 }
 
 export interface EvidenceSource {
@@ -39,7 +39,7 @@ export interface EvidenceSource {
   authorityTier: 1 | 2 | 3;
   date: string;
   spans: number;
-  simulated: true;
+  simulated?: boolean;
 }
 
 export interface ChatMessage {
@@ -54,7 +54,7 @@ export interface ChatMessage {
   approvalId?: string;
   streaming?: boolean;
   sources?: EvidenceSource[];
-  simulated?: true;
+  simulated?: boolean;
 }
 
 export interface TaskEvent {
@@ -97,7 +97,7 @@ export interface TaskRecord {
   route?: RouteInfo;
   outcome?: 'completed' | 'failed' | 'cancelled';
   blocker?: string;
-  simulated: true;
+  simulated?: boolean;
 }
 
 export interface ApprovalRequest {
@@ -124,7 +124,7 @@ export interface MemoryItem {
   updatedAt: string;
   version: number;
   conflictsWith?: string;
-  simulated: true;
+  simulated?: boolean;
 }
 
 export interface McpTool {
@@ -157,7 +157,7 @@ export interface McpServer {
   enabled: boolean;
   tools: McpTool[];
   history: CapabilityCall[];
-  simulated: true;
+  simulated?: boolean;
 }
 
 export interface Skill {
@@ -171,7 +171,7 @@ export interface Skill {
   hashStatus: 'approved' | 'changed';
   requires: string[];
   compatibility: string;
-  simulated: true;
+  simulated?: boolean;
 }
 
 export type ProviderHealth = 'up' | 'degraded' | 'down' | 'not_configured' | 'probing';
@@ -185,7 +185,7 @@ export interface ProviderInfo {
   lastProbe: string;
   consent: DataClass[];
   models: string[];
-  simulated: true;
+  simulated?: boolean;
 }
 
 export interface TierConfig {
@@ -220,7 +220,7 @@ export interface RoutingState {
   noModelShare: number;
   medianFirstTokenMs: number;
   fallbacks24h: number;
-  simulated: true;
+  simulated?: boolean;
 }
 
 export interface PolicyRule {
@@ -257,7 +257,7 @@ export interface VoiceSnapshot {
   engine: 'whisper_local' | 'gemini_live_cloud';
   cloudConsent: boolean;
   micOpen: boolean;
-  simulated: true;
+  simulated?: boolean;
 }
 
 export interface SearchResult {
@@ -266,7 +266,7 @@ export interface SearchResult {
   provider: string;
   authorityTier: 1 | 2 | 3;
   snippet: string;
-  simulated: true;
+  simulated?: boolean;
 }
 
 export interface LogEntry {
