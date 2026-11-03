@@ -665,7 +665,86 @@ async fn test_search_endpoints_and_ssrf_protection() {
 
     assert!(tool_names.contains(&"web.search"));
     assert!(tool_names.contains(&"web.fetch"));
-    assert_eq!(tool_names.len(), 7); // 5 native + 2 web
+    assert!(tool_names.contains(&"desktop.system_metrics"));
+    assert!(tool_names.contains(&"desktop.list_apps"));
+    assert!(tool_names.contains(&"desktop.launch_app"));
+    assert!(tool_names.contains(&"desktop.active_window"));
+    assert_eq!(tool_names.len(), 11); // 5 native + 2 web + 4 desktop
+}
+
+#[tokio::test]
+async fn test_desktop_endpoints_metrics_apps_window() {
+    let storage = Storage::open_in_memory().unwrap();
+    let event_bus = EventBus::new(16);
+    let state = AppState::new(storage, event_bus, ProviderRegistry::new(), None);
+    let app = create_router(state);
+
+    // 1. GET /v1/desktop/metrics
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/desktop/metrics")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(val.get("uptime_seconds").is_some());
+    assert!(val.get("memory_total_bytes").is_some());
+    assert!(val.get("os_name").is_some());
+
+    // 2. GET /v1/desktop/apps
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/desktop/apps?q=editor")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(val["query"], "editor");
+    assert!(val["apps"].is_array());
+
+    // 3. GET /v1/desktop/window
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/desktop/window")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(val["session_type"].is_string());
+    assert!(val["desktop_environment"].is_string());
 }
 
 

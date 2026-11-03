@@ -111,11 +111,24 @@
 
 | Task ID | Component | Description | Status | Verification Criteria |
 |---------|-----------|-------------|--------|-----------------------|
-| **TSK-1001** | `edith-desktop` | System metrics collector (CPU load, RAM usage, storage mounts, system uptime) | Planned | Unit and integration tests report valid host telemetry |
-| **TSK-1002** | `edith-desktop` | Application discovery and launcher (`.desktop` entries on GNOME/Linux, binary execution) | Planned | App launcher resolves installed desktop applications |
-| **TSK-1003** | `edith-desktop` | Window manager inspection abstraction (GNOME Shell / Wayland / X11 active window tracking) | Planned | Active window queries return current workspace info |
-| **TSK-1004** | `edith-tools` | Register desktop tools (`desktop.launch_app`, `desktop.system_metrics`, `desktop.active_window`) into `ToolRegistry` | Planned | ToolRegistry contains desktop capabilities under policy controls |
-| **TSK-1005** | `edith-api` | Desktop environment endpoints (`GET /v1/desktop/metrics`, `GET /v1/desktop/apps`, `POST /v1/desktop/launch`) | Planned | API integration tests pass |
+| **TSK-1001** | `edith-desktop` | System metrics collector (CPU load, RAM usage, storage mounts, system uptime) | **Completed** | Real-time `/proc` metrics and disk telemetry verified |
+| **TSK-1002** | `edith-desktop` | Application discovery and launcher (`.desktop` entries on GNOME/Linux, binary execution) | **Completed** | Discovers installed desktop applications and parses XDG files |
+| **TSK-1003** | `edith-desktop` | Window manager inspection abstraction (GNOME Shell / Wayland / X11 active window tracking) | **Completed** | Session and desktop window environment context verified |
+| **TSK-1004** | `edith-tools` | Register desktop tools (`desktop.launch_app`, `desktop.system_metrics`, `desktop.list_apps`, `desktop.active_window`) into `ToolRegistry` | **Completed** | ToolRegistry contains all 4 desktop tools under autonomy controls |
+| **TSK-1005** | `edith-api` | Desktop environment endpoints (`GET /v1/desktop/metrics`, `GET /v1/desktop/apps`, `POST /v1/desktop/launch`, `GET /v1/desktop/window`) | **Completed** | API integration tests pass and live daemon curl verified |
+
+---
+
+## Epic 11: Full Interface & Desktop Shell Integration (Phase 11)
+
+| Task ID | Component | Description | Status | Verification Criteria |
+|---------|-----------|-------------|--------|-----------------------|
+| **TSK-1101** | `apps/desktop` / `prototype` | Connect frontend client state and API adapter to live EDITH daemon REST/WS API | Planned | Prototype communicates with live daemon over HTTP/WS with auth token |
+| **TSK-1102** | `apps/desktop` / `prototype` | Real-time conversation streaming and turn persistence integration | Planned | UI displays streaming message deltas, reasoning blocks, and persisted sessions |
+| **TSK-1103** | `apps/desktop` / `prototype` | Voice PTT and level meter integration with `edith-voice` | Planned | UI visualizes audio level meter and handles voice state transitions |
+| **TSK-1104** | `apps/desktop` / `prototype` | Task execution and tool activity timeline view | Planned | Multi-step task waves and tool execution logs render in UI |
+| **TSK-1105** | `apps/desktop` / `prototype` | Memory management, provenance viewer, and desktop system telemetry view | Planned | Semantic memories and host system telemetry render live data |
+
 
 
 

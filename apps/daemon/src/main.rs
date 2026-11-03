@@ -98,7 +98,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Initializing Search & Research Infrastructure...");
     let search = std::sync::Arc::new(edith_search::SearchService::default());
 
-    // 9. Build API Router
+    // 9. Initialize Desktop Environment Integrations
+    info!("Initializing Desktop Environment Integrations (metrics, app launcher, window context)...");
+
+    // 10. Build API Router
     let app_state = AppState::new(
         storage,
         event_bus.clone(),

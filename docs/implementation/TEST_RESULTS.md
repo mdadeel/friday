@@ -128,5 +128,11 @@
     - SSRF Attack Denial: `POST /v1/search/fetch` targeting `http://127.0.0.1:4242/v1/health` and `http://localhost/secret` correctly rejected with `403 Forbidden` (`SSRF blocked: IPv4 address '127.0.0.1' is in a private/local range`), proving zero-trust network boundaries.
     - Public Fetch & Evidence Extraction: `POST /v1/search/fetch` with valid URL extracts sanitized content, removes `<head>/<script>/<style>`, computes SHA-256 hash, and chunks into traceable evidence blocks.
     - Evidence Verification: `POST /v1/search/evidence` validates exact quote matches against the document content hash; rejects fabricated or mismatched quotes (`EvidenceMismatch`).
+  - **Desktop Environment Integrations & Telemetry (Phase 10)**:
+    - Registered Tools: `GET /v1/tools` enumerates 11 total registered tools including `desktop.system_metrics`, `desktop.list_apps`, `desktop.launch_app`, and `desktop.active_window`.
+    - Host Telemetry Probe: `GET /v1/desktop/metrics` returns real-time kernel metrics: CPU 5.14%, load averages [1.36, 0.87, 0.73], memory total 14.5 GB (used 5.48 GB, 37.72%), disk total 247.6 GB (used 156.1 GB, 63.06%), OS Ubuntu 26.04.1 LTS on kernel Linux 7.0.0-42-generic.
+    - Application Discovery: `GET /v1/desktop/apps?q=chrome` discovers `/usr/share/applications/google-chrome.desktop`, parsing categories, clean exec path `/usr/bin/google-chrome-stable`, and icon.
+    - Window & Session Context: `GET /v1/desktop/window` returns active display server `wayland`, desktop environment `ubuntu:GNOME`, display `wayland-0`, and workspace `1`.
+
 
 

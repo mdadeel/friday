@@ -19,6 +19,10 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use edith_search::{SearchService, WebFetchTool, WebSearchTool};
 use edith_voice::{MockSpeechRecognizer, MockSpeechSynthesizer, VoiceManager, VoiceStatus};
+use edith_desktop::{
+    AppLauncher, DesktopActiveWindowTool, DesktopLaunchAppTool, DesktopListAppsTool,
+    DesktopSystemMetricsTool, LinuxDesktopInspector, SystemMetricsCollector, WindowInspector,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -36,6 +40,9 @@ pub struct AppState {
     pub agent: AgentRuntime,
     pub voice: Arc<VoiceManager>,
     pub search: Arc<SearchService>,
+    pub metrics_collector: Arc<SystemMetricsCollector>,
+    pub app_launcher: Arc<AppLauncher>,
+    pub window_inspector: Arc<dyn WindowInspector>,
     pub active_cancellations: Arc<RwLock<HashMap<String, CancellationToken>>>,
     pub auth_token: Option<String>,
 }
@@ -48,9 +55,17 @@ impl AppState {
         auth_token: Option<String>,
     ) -> Self {
         let search = Arc::new(SearchService::default());
+        let metrics_collector = Arc::new(SystemMetricsCollector::new());
+        let app_launcher = Arc::new(AppLauncher::new());
+        let window_inspector: Arc<dyn WindowInspector> = Arc::new(LinuxDesktopInspector::new());
+
         let mut tool_registry = edith_tools::ToolRegistry::with_builtins();
         tool_registry.register(Arc::new(WebSearchTool::new(search.clone())));
         tool_registry.register(Arc::new(WebFetchTool::new(search.clone())));
+        tool_registry.register(Arc::new(DesktopSystemMetricsTool::with_collector(metrics_collector.clone())));
+        tool_registry.register(Arc::new(DesktopListAppsTool::with_launcher(app_launcher.clone())));
+        tool_registry.register(Arc::new(DesktopLaunchAppTool::with_launcher(app_launcher.clone())));
+        tool_registry.register(Arc::new(DesktopActiveWindowTool::with_inspector(window_inspector.clone())));
 
         let agent = AgentRuntime::with_tools(
             storage.clone(),
@@ -73,6 +88,9 @@ impl AppState {
             agent,
             voice,
             search,
+            metrics_collector,
+            app_launcher,
+            window_inspector,
             active_cancellations: Arc::new(RwLock::new(HashMap::new())),
             auth_token,
         }
@@ -85,6 +103,18 @@ impl AppState {
 
     pub fn with_search(mut self, search: Arc<SearchService>) -> Self {
         self.search = search;
+        self
+    }
+
+    pub fn with_desktop(
+        mut self,
+        metrics: Arc<SystemMetricsCollector>,
+        launcher: Arc<AppLauncher>,
+        window: Arc<dyn WindowInspector>,
+    ) -> Self {
+        self.metrics_collector = metrics;
+        self.app_launcher = launcher;
+        self.window_inspector = window;
         self
     }
 }
@@ -185,6 +215,18 @@ pub struct EvidenceRequest {
     pub quote: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LaunchAppRequest {
+    pub app: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AppsQuery {
+    pub q: Option<String>,
+}
+
 pub fn create_router(state: AppState) -> Router {
     let auth_token = state.auth_token.clone();
 
@@ -228,6 +270,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/v1/search", post(search_handler))
         .route("/v1/search/fetch", post(fetch_handler))
         .route("/v1/search/evidence", post(evidence_handler))
+        .route("/v1/desktop/metrics", get(desktop_metrics_handler))
+        .route("/v1/desktop/apps", get(desktop_apps_handler))
+        .route("/v1/desktop/launch", post(desktop_launch_handler))
+        .route("/v1/desktop/window", get(desktop_window_handler))
         .route("/v1/events", get(events_ws_handler))
         .layer(middleware::from_fn(move |headers, req, next| {
             let token = auth_token.clone();
@@ -869,6 +915,57 @@ async fn evidence_handler(
         .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e.to_string()))?;
 
     Ok(Json(serde_json::to_value(span).unwrap_or_default()))
+}
+
+async fn desktop_metrics_handler(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let metrics = state
+        .metrics_collector
+        .collect()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to collect metrics: {}", e)))?;
+    Ok(Json(serde_json::to_value(metrics).unwrap_or_default()))
+}
+
+async fn desktop_apps_handler(
+    State(state): State<AppState>,
+    Query(query): Query<AppsQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let q = query.q.unwrap_or_default();
+    let apps = state.app_launcher.search_apps(&q).await;
+    Ok(Json(serde_json::json!({
+        "query": q,
+        "count": apps.len(),
+        "apps": apps
+    })))
+}
+
+async fn desktop_launch_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<LaunchAppRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let pid = state
+        .app_launcher
+        .launch_app(&payload.app, &payload.args)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Launch failed: {}", e)))?;
+    Ok(Json(serde_json::json!({
+        "app": payload.app,
+        "pid": pid,
+        "status": "launched"
+    })))
+}
+
+async fn desktop_window_handler(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let window = state
+        .window_inspector
+        .get_active_window()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Window inspection failed: {}", e)))?;
+    Ok(Json(serde_json::to_value(window).unwrap_or_default()))
 }
 
 #[cfg(test)]

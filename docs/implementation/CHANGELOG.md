@@ -1,5 +1,36 @@
 # EDITH 2.0 — Engineering Changelog
 
+## [0.10.0] - 2026-11-03
+
+### Phase 10: Desktop Environment Integrations
+- Created crate [`crates/edith-desktop`](crates/edith-desktop):
+  - **Linux System Metrics Collector** (`metrics.rs`):
+    - Real-time kernel telemetry collector parsing `/proc/stat` (CPU usage %), `/proc/loadavg` (1m, 5m, 15m loads), `/proc/meminfo` (total, available, used memory bytes and %), `/proc/uptime`, `/etc/os-release`, and `/proc/version`.
+    - Storage volume inspection parsing filesystem capacity, used, and free bytes via `df -k /`.
+  - **FreeDesktop XDG Application Discovery & Launcher** (`apps.rs`):
+    - Scans system and user desktop entry directories (`/usr/share/applications`, `~/.local/share/applications`, Flatpak, Snap).
+    - Parses INI `[Desktop Entry]` specifications: ID, Name, GenericName, Comment, Exec, Icon, Categories, Terminal, and filters `NoDisplay` entries.
+    - Strips XDG parameter field codes (`%u`, `%f`, `%F`, etc.) to produce clean executable command lines.
+    - Asynchronous process spawner with argument forwarding and PID return.
+  - **Desktop Environment & Window Context Inspector** (`window.rs`):
+    - Inspects display server (`wayland` vs `x11`), desktop environment (`ubuntu:GNOME`), and active display (`wayland-0`).
+    - Provides `WindowInspector` trait and `MockWindowInspector` for deterministic unit testing.
+  - **Native Agent Tools** (`tools.rs`):
+    - `desktop.system_metrics`: returns host CPU %, load averages, RAM used/total, disk capacity, uptime.
+    - `desktop.list_apps`: lists installed desktop applications with query filtering.
+    - `desktop.launch_app`: launches desktop applications by ID or name with arguments under `ConfirmationRequired` policy.
+    - `desktop.active_window`: queries active desktop environment context and window state.
+- API and Daemon Integration:
+  - Added desktop routes in `edith-api`: `GET /v1/desktop/metrics`, `GET /v1/desktop/apps`, `POST /v1/desktop/launch`, `GET /v1/desktop/window`.
+  - Registered all 4 desktop tools into `ToolRegistry`, raising total registered tools to 11.
+  - Wired into `AppState` and initialized during daemon startup.
+- Verification & Testing:
+  - 11 new tests added (10 unit tests in `edith-desktop` + 1 integration test in `edith-api`).
+  - Workspace test suite passes with **96 tests passing** across all 13 crates.
+  - Live daemon tested with curl: `GET /v1/desktop/metrics` reports real host telemetry (5.14% CPU, 14.5 GB RAM, Ubuntu 26.04.1 LTS); `GET /v1/desktop/apps?q=chrome` returns Google Chrome `.desktop` definition; `GET /v1/desktop/window` returns GNOME Wayland context; `GET /v1/tools` enumerates all 11 registered tools.
+
+---
+
 ## [0.9.0] - 2026-11-03
 
 ### Phase 9: Search & Research Infrastructure

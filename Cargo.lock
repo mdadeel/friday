@@ -276,6 +276,7 @@ dependencies = [
  "chrono",
  "edith-agent",
  "edith-core",
+ "edith-desktop",
  "edith-events",
  "edith-memory",
  "edith-models",
@@ -316,6 +317,7 @@ dependencies = [
  "axum",
  "edith-api",
  "edith-core",
+ "edith-desktop",
  "edith-events",
  "edith-models",
  "edith-search",
@@ -330,6 +332,20 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "edith-desktop"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "edith-core",
+ "edith-tools",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

@@ -15,6 +15,7 @@ edith-storage.workspace = true
 edith-models.workspace = true
 edith-voice.workspace = true
 edith-search.workspace = true
+edith-desktop.workspace = true
 edith-api.workspace = true
 tokio.workspace = true
 tracing.workspace = true
