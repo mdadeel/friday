@@ -101,13 +101,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut req = client.post(format!("{base_url}/v1/sessions/{session_id}/messages"))
                 .json(&serde_json::json!({"text": msg, "source": "text"}));
             if let Some(ref t) = token { req = req.bearer_auth(t); }
-            let _res = req.send().await?;
+            let m_res = req.send().await?;
+            let m_val: Value = m_res.json().await?;
+            let user_turn_id = m_val["turn_id"].as_str().unwrap_or("").to_string();
 
             // Poll for assistant response
             print!("Thinking");
             let mut reply = String::new();
-            for _ in 0..30 {
-                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+            for _ in 0..60 {
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                 print!(".");
                 use std::io::Write;
                 let _ = std::io::stdout().flush();
@@ -116,10 +118,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(ref t) = token { req = req.bearer_auth(t); }
                 if let Ok(res) = req.send().await {
                     if let Ok(turns) = res.json::<Vec<Value>>().await {
-                        if let Some(last) = turns.iter().rev().find(|t| t["role"] == "assistant") {
-                            if let Some(c) = last["content"].as_str() {
-                                reply = c.to_string();
-                                break;
+                        let user_idx = turns.iter().position(|t| t["id"] == user_turn_id);
+                        if let Some(idx) = user_idx {
+                            if let Some(matching) = turns.iter().skip(idx + 1).find(|t| t["role"] == "assistant") {
+                                if let Some(c) = matching["content"].as_str() {
+                                    reply = c.to_string();
+                                    break;
+                                }
                             }
                         }
                     }

@@ -58,7 +58,7 @@ pub struct ModelRequest {
 }
 
 fn default_timeout() -> u64 {
-    60
+    300
 }
 
 impl ModelRequest {

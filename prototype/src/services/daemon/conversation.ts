@@ -103,7 +103,7 @@ export function createDaemonConversationService(client: DaemonClient): Conversat
 
       try {
         const sessionId = await ensureSession();
-        await client.postJson<{
+        const postRes = await client.postJson<{
           turn_id: string;
           task_id: string;
         }>(`/v1/sessions/${sessionId}/messages`, {
@@ -112,8 +112,8 @@ export function createDaemonConversationService(client: DaemonClient): Conversat
         });
 
         // Polling fallback to guarantee completion if WebSocket lagged or missed
-        for (let i = 0; i < 30; i++) {
-          await new Promise((r) => setTimeout(r, 250));
+        for (let i = 0; i < 60; i++) {
+          await new Promise((r) => setTimeout(r, 500));
           const current = store.get().find((m) => m.id === assistantMsgId);
           if (current && !current.streaming && current.text.trim()) {
             break;
@@ -123,18 +123,24 @@ export function createDaemonConversationService(client: DaemonClient): Conversat
             const turns = await client.getJson<
               Array<{ id: string; role: string; content: string }>
             >(`/v1/sessions/${sessionId}/turns`);
-            const lastAssistant = [...turns]
-              .reverse()
-              .find((t) => t.role === 'assistant');
-            if (lastAssistant && lastAssistant.content) {
-              store.set((msgs) =>
-                msgs.map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, text: lastAssistant.content, streaming: false }
-                    : m
-                )
-              );
-              break;
+
+            // The matching assistant turn must appear strictly after this user's turn
+            const userTurnIdx = turns.findIndex((t) => t.id === postRes.turn_id);
+            if (userTurnIdx !== -1) {
+              const matchingAssistant = turns
+                .slice(userTurnIdx + 1)
+                .find((t) => t.role === 'assistant');
+
+              if (matchingAssistant && matchingAssistant.content) {
+                store.set((msgs) =>
+                  msgs.map((m) =>
+                    m.id === assistantMsgId
+                      ? { ...m, text: matchingAssistant.content, streaming: false }
+                      : m
+                  )
+                );
+                break;
+              }
             }
           } catch {
             // continue polling
