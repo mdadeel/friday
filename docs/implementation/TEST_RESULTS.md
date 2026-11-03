@@ -113,3 +113,13 @@
     - `POST /v1/memory/items`: successfully created explicit semantic fact `"Owner timezone is Asia/Dhaka"` (persisted in SQLite `memory_items` table).
     - `GET /v1/memory/items?q=Dhaka`: verified full-text retrieval returning confirmed item.
     - Secret Injection Rejection: verified that sending an API key payload (`sk-...`) returns a 400 Bad Request rejection (`Secret data detected in memory payload`), proving security policy compliance.
+  - **Voice Engine & Microphone Privacy Gatekeeper (Phase 8)**:
+    - `GET /v1/voice/status`: verified initial `state = "idle"`, `mic_active = false`.
+    - Privacy Enforcement: `POST /v1/voice/audio` while in `Idle` rejected with `400 Bad Request` (`Microphone closed in state Idle`), proving microphone isolation outside `Listening`.
+    - Push-to-Talk Lifecycle:
+      - `POST /v1/voice/start`: entered `listening`, `mic_active = true`.
+      - `POST /v1/voice/audio`: streamed 5 speech frames (480 samples each @ 16 kHz) -> VAD detected speech onset (>= 150 ms) -> transitioned to `transcribing`.
+      - `POST /v1/voice/stop`: manual endpoint -> transcribed audio -> returned `TranscriptionResult` (`confidence: 0.95`, `text: "Spoken audio captured: 2400 samples (150ms)"`) -> transitioned to `thinking`, microphone immediately closed.
+    - Speech Synthesis (TTS):
+      - `POST /v1/voice/tts` with `"Hello owner, EDITH is ready to assist you."` -> synthesized 32,000 samples (2000 ms PCM audio @ 16 kHz) with sentence segmentation and markdown sanitization.
+

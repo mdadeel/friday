@@ -1,5 +1,49 @@
 # EDITH 2.0 — Engineering Changelog
 
+## [0.8.0] - 2026-11-03
+
+### Phase 8: Voice Engine
+- Created crate [`crates/edith-voice`](crates/edith-voice):
+  - **Audio Capture & Ring Buffer** (`audio.rs`):
+    - Circular buffer storing 16-bit 16 kHz mono PCM samples with capacity bounds (default 160,000 samples = 10s of audio).
+    - `AudioMetrics` utility calculating RMS energy and dBFS levels (`calculate_db`).
+  - **Voice State Machine & Privacy Gatekeeper** (`state.rs`):
+    - Implemented full state machine: `Off`, `Idle`, `Listening`, `Transcribing`, `Finalising`, `Dispatching`, `Thinking`, `Speaking`, `Interrupted`, `Error`.
+    - Strict privacy rule: `is_mic_active` returns `true` only during `Listening`, `Transcribing`, `Finalising`, and `Speaking` (barge-in monitoring).
+    - Microphones are strictly closed and protected in `Off`, `Idle`, `Thinking`, `Dispatching`, or `Error`.
+  - **Voice Activity Detection (VAD) & Endpointer** (`vad.rs`):
+    - Speech onset detection requiring >= 150 ms of sustained speech above RMS energy threshold (avoids coughs/clicks).
+    - Continuous silence detection (>= 700 ms) triggering automatic speech endpointing.
+    - Manual endpoint support for push-to-talk (PTT) release.
+  - **Sentence Segmenter & Spoken Text Preparation** (`segmenter.rs`):
+    - Sanitizes markdown responses for pleasant spoken delivery: replaces code blocks (` ```...``` ` -> "[code block omitted]"), strips tables, converts links (`[text](url)` -> "text"), and normalizes punctuation.
+    - Incremental sentence chunker splitting text into speakable sentences for streaming TTS.
+  - **Speech Recognition (ASR)** (`asr.rs`):
+    - Defined `SpeechRecognizer` trait and `TranscriptionResult`.
+    - Built-in 16-bit mono 16 kHz RIFF WAV encoder (`encode_wav_mono`).
+    - Implemented `WhisperCppRecognizer` HTTP adapter connecting to local whisper.cpp server.
+    - Implemented deterministic `MockSpeechRecognizer` for offline automated testing.
+  - **Speech Synthesis (TTS)** (`tts.rs`):
+    - Defined `SpeechSynthesizer` trait and `AudioData`.
+    - Implemented `CommandSpeechSynthesizer` for Linux TTS engines.
+    - Implemented `MockSpeechSynthesizer` generating test PCM audio with durations matched to word count.
+  - **Barge-in Controller** (`barge_in.rs`):
+    - Sub-150ms cancellation sink for TTS playback upon speech onset detection during `Speaking`.
+  - **Voice Engine Facade** (`manager.rs`):
+    - `VoiceManager` coordinating state machine, audio buffer, VAD, ASR, TTS, barge-in, and `EventBus` broadcasts (`voice.state_changed`, `voice.level_meter`, `voice.speech_onset`, `voice.speech_endpoint`, `voice.transcription`, `voice.speech_started`, `voice.speech_completed`, `voice.barge_in`).
+    - Enforces confidence gate: transcriptions with confidence < 0.40 are discarded without dispatching.
+- API and Daemon Integration:
+  - Updated `edith-core::config::VoiceConfig` with defaults (`enabled`, `asr_provider`, `tts_provider`, `sample_rate`, `vad_silence_ms`, `barge_in_ms`, `whisper_url`).
+  - Added voice endpoints in `edith-api`: `GET /v1/voice/status`, `POST /v1/voice/start`, `POST /v1/voice/stop`, `POST /v1/voice/cancel`, `POST /v1/voice/audio`, and `POST /v1/voice/tts`.
+  - Updated `GET /v1/status` to report real live voice state.
+  - Initialized `VoiceManager` in `apps/daemon/src/main.rs`.
+- Verification & Testing:
+  - 20 new tests added (19 unit tests in `edith-voice` + 1 integration test in `edith-api`).
+  - Full workspace test suite passes with **76 tests passing** across all 11 crates.
+  - Live daemon tested with curl: `GET /v1/voice/status` returns idle state; `POST /v1/voice/audio` while idle is rejected with 400 Bad Request; PTT start enters listening with mic active; audio frames trigger onset and transcribing; PTT stop returns final transcript and enters thinking with mic closed; and TTS synthesizes spoken audio frames.
+
+---
+
 ## [0.7.0] - 2026-11-03
 
 ### Phase 7: Persistent Memory

@@ -12,6 +12,8 @@ pub struct EdithConfig {
     pub models: ModelsConfig,
     #[serde(default)]
     pub security: SecurityConfig,
+    #[serde(default)]
+    pub voice: VoiceConfig,
 }
 
 impl Default for EdithConfig {
@@ -21,6 +23,7 @@ impl Default for EdithConfig {
             storage: StorageConfig::default(),
             models: ModelsConfig::default(),
             security: SecurityConfig::default(),
+            voice: VoiceConfig::default(),
         }
     }
 }
@@ -174,3 +177,60 @@ impl Default for SecurityConfig {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoiceConfig {
+    #[serde(default = "default_voice_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_asr_provider")]
+    pub asr_provider: String,
+    #[serde(default = "default_tts_provider")]
+    pub tts_provider: String,
+    #[serde(default = "default_sample_rate")]
+    pub sample_rate: u32,
+    #[serde(default = "default_vad_silence_ms")]
+    pub vad_silence_ms: u64,
+    #[serde(default = "default_barge_in_ms")]
+    pub barge_in_ms: u64,
+    #[serde(default)]
+    pub whisper_url: Option<String>,
+}
+
+fn default_voice_enabled() -> bool {
+    true
+}
+
+fn default_asr_provider() -> String {
+    "mock".to_string()
+}
+
+fn default_tts_provider() -> String {
+    "mock".to_string()
+}
+
+fn default_sample_rate() -> u32 {
+    16000
+}
+
+fn default_vad_silence_ms() -> u64 {
+    700
+}
+
+fn default_barge_in_ms() -> u64 {
+    150
+}
+
+impl Default for VoiceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_voice_enabled(),
+            asr_provider: default_asr_provider(),
+            tts_provider: default_tts_provider(),
+            sample_rate: default_sample_rate(),
+            vad_silence_ms: default_vad_silence_ms(),
+            barge_in_ms: default_barge_in_ms(),
+            whisper_url: None,
+        }
+    }
+}
+

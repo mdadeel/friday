@@ -75,13 +75,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Stored authentication token at {:?}", token_path);
     }
 
-    // 7. Build API Router
+    // 7. Initialize Voice Engine
+    info!(
+        "Initializing Voice Engine (ASR: {}, TTS: {})...",
+        config.voice.asr_provider, config.voice.tts_provider
+    );
+    let asr: std::sync::Arc<dyn edith_voice::SpeechRecognizer> = if let Some(ref url) = config.voice.whisper_url {
+        std::sync::Arc::new(edith_voice::WhisperCppRecognizer::new(url))
+    } else {
+        std::sync::Arc::new(edith_voice::MockSpeechRecognizer::default())
+    };
+    let tts: std::sync::Arc<dyn edith_voice::SpeechSynthesizer> =
+        std::sync::Arc::new(edith_voice::MockSpeechSynthesizer);
+    let voice = std::sync::Arc::new(edith_voice::VoiceManager::new(
+        config.voice.clone(),
+        Some(event_bus.clone()),
+        asr,
+        tts,
+    ));
+
+    // 8. Build API Router
     let app_state = AppState::new(
         storage,
         event_bus.clone(),
         provider_registry,
         Some(auth_token.clone()),
-    );
+    )
+    .with_voice(voice);
     let router = create_router(app_state);
 
     // 7. Start Listeners

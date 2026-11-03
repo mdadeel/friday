@@ -17,8 +17,8 @@
 | **Phase 5** | Intelligent Model Routing | **Verified Done** | 37 workspace tests pass; live Tier 0 & fallback verified | `edith-router` crate, Tier 0 regex/math matcher (0 tokens), complexity classifier (T1–T4), route decision audit logging in SQLite |
 | **Phase 6** | Tool & MCP Infrastructure | **Verified Done** | 50 workspace tests pass; live `/v1/tools` verified | `edith-tools` & `edith-mcp` crates, `Tool` trait, `PolicyEngine`, built-in tools (fs, command, datetime), `StdioMcpClient`, MCP adapter, execution integration |
 | **Phase 7** | Persistent Memory | **Verified Done** | 56 workspace tests pass; live memory CRUD verified | `edith-memory` crate, migration 0003, provenance rules, secret gatekeeper, episodic event logging, context injection |
-| **Phase 8** | Voice Engine | **Ready** | Next milestone | Audio capture, Faster-Whisper, VAD |
-| **Phase 9** | Search & Research Infrastructure | Planned | Pending Phase 8 | Search providers, evidence extraction |
+| **Phase 8** | Voice Engine | **Verified Done** | 76 workspace tests pass; live voice endpoints verified | `edith-voice` crate, 16 kHz audio buffer, VAD state machine, mic privacy gatekeeper, Whisper ASR adapter, TTS pipeline, barge-in controller, `/v1/voice/*` |
+| **Phase 9** | Search & Research Infrastructure | **Ready** | Next milestone | Search providers, web fetcher, evidence extraction |
 | **Phase 10** | Desktop Environment Integrations | Planned | Pending Phase 9 | Linux FS, terminal, processes |
 | **Phase 11** | Full Interface & Desktop Shell | Planned | Pending Phase 10 | Tauri desktop shell & prototype hookup |
 | **Phase 12** | Testing, Hardening & Evaluation | Planned | Continuous | Unit, contract, benchmark suites |
@@ -41,5 +41,6 @@
 | `crates/edith-tools` | YES | YES | YES | YES (8 tests) | YES (Policy engine, fs, command, datetime) |
 | `crates/edith-mcp` | YES | YES | YES | YES (3 tests) | YES (JSON-RPC 2.0, MCP client, adapter) |
 | `crates/edith-memory` | YES | YES | YES | YES (5 tests) | YES (Provenance, gatekeeper, context builder) |
-| `crates/edith-api` | YES | YES | YES | YES (7 tests) | YES (Memory CRUD, tools, direct dispatch) |
+| `crates/edith-voice` | YES | YES | YES | YES (19 tests) | YES (VAD, ASR, TTS, Barge-in, Privacy) |
+| `crates/edith-api` | YES | YES | YES | YES (8 tests) | YES (Voice sessions, memory CRUD, tools) |
 | `apps/daemon` | YES | YES | YES | YES (Live run) | YES (Dual Unix & TCP socket) |

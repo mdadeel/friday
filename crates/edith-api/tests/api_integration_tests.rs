@@ -447,3 +447,139 @@ async fn test_memory_items_endpoints_lifecycle() {
     assert_eq!(res.status(), StatusCode::OK);
     assert!(storage.get_memory_item(&memory_id).await.unwrap().is_none());
 }
+
+#[tokio::test]
+async fn test_voice_api_endpoints_and_privacy() {
+    let storage = Storage::open_in_memory().expect("Storage in-memory open failed");
+    let event_bus = EventBus::new(64);
+    let models = ProviderRegistry::new();
+    models
+        .register(Arc::new(MockProvider::default()))
+        .await;
+
+    let state = AppState::new(storage.clone(), event_bus, models, None);
+    let app = create_router(state);
+
+    // 1. Check Voice Status initially Idle
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/voice/status")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(val["state"], "idle");
+    assert_eq!(val["mic_active"], false);
+
+    // 2. Privacy enforcement: Push audio while Idle MUST be rejected with 400
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/voice/audio")
+                .header("Content-Type", "application/json")
+                .body(Body::from(r#"{"samples": [100, 200, 300]}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 3. Start listening (Push-to-talk press)
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/voice/start")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(val["state"], "listening");
+    assert_eq!(val["mic_active"], true);
+
+    // 4. Push active audio frames while Listening
+    let loud_samples = vec![1500i16; 480];
+    let body = serde_json::json!({ "samples": loud_samples }).to_string();
+    for _ in 0..5 {
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/voice/audio")
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(body.clone()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    // 5. Stop listening (Push-to-talk release) -> triggers transcription
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/voice/stop")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(val["status"], "ok");
+    assert!(val["transcription"]["text"].is_string());
+
+    // 6. Synthesize Speech via POST /v1/voice/tts
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/voice/tts")
+                .header("Content-Type", "application/json")
+                .body(Body::from(r#"{"text": "Hello world, EDITH is fully operational."}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(val["duration_ms"].as_u64().unwrap() > 0);
+    assert_eq!(val["sample_rate"], 16000);
+}
+

@@ -17,6 +17,7 @@ use edith_models::ProviderRegistry;
 use edith_storage::Storage;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use edith_voice::{MockSpeechRecognizer, MockSpeechSynthesizer, VoiceManager, VoiceStatus};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -32,6 +33,7 @@ pub struct AppState {
     pub event_bus: EventBus,
     pub models: ProviderRegistry,
     pub agent: AgentRuntime,
+    pub voice: Arc<VoiceManager>,
     pub active_cancellations: Arc<RwLock<HashMap<String, CancellationToken>>>,
     pub auth_token: Option<String>,
 }
@@ -44,14 +46,26 @@ impl AppState {
         auth_token: Option<String>,
     ) -> Self {
         let agent = AgentRuntime::new(storage.clone(), event_bus.clone(), models.clone());
+        let voice = Arc::new(VoiceManager::new(
+            edith_core::config::VoiceConfig::default(),
+            Some(event_bus.clone()),
+            Arc::new(MockSpeechRecognizer::default()),
+            Arc::new(MockSpeechSynthesizer),
+        ));
         Self {
             storage,
             event_bus,
             models,
             agent,
+            voice,
             active_cancellations: Arc::new(RwLock::new(HashMap::new())),
             auth_token,
         }
+    }
+
+    pub fn with_voice(mut self, voice: Arc<VoiceManager>) -> Self {
+        self.voice = voice;
+        self
     }
 }
 
@@ -123,6 +137,16 @@ pub struct ListMemoryQuery {
     pub q: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PushAudioRequest {
+    pub samples: Vec<i16>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TtsRequest {
+    pub text: String,
+}
+
 pub fn create_router(state: AppState) -> Router {
     let auth_token = state.auth_token.clone();
 
@@ -157,6 +181,12 @@ pub fn create_router(state: AppState) -> Router {
             "/v1/memory/items/{id}",
             axum::routing::patch(update_memory_item_handler).delete(delete_memory_item_handler),
         )
+        .route("/v1/voice/status", get(voice_status_handler))
+        .route("/v1/voice/start", post(voice_start_handler))
+        .route("/v1/voice/stop", post(voice_stop_handler))
+        .route("/v1/voice/cancel", post(voice_cancel_handler))
+        .route("/v1/voice/audio", post(voice_audio_handler))
+        .route("/v1/voice/tts", post(voice_tts_handler))
         .route("/v1/events", get(events_ws_handler))
         .layer(middleware::from_fn(move |headers, req, next| {
             let token = auth_token.clone();
@@ -228,11 +258,13 @@ async fn status_handler(State(state): State<AppState>) -> Json<StatusResponse> {
         providers_status.insert(id, Value::String(status));
     }
 
+    let voice_status = state.voice.status().await;
+
     Json(StatusResponse {
         active_tasks,
         storage_ok: true,
         providers: Value::Object(providers_status),
-        voice_state: "idle".to_string(),
+        voice_state: voice_status.state.to_string(),
     })
 }
 
@@ -668,6 +700,85 @@ async fn handle_events_socket(mut socket: WebSocket, event_bus: EventBus) {
             }
         }
     }
+}
+
+async fn voice_status_handler(State(state): State<AppState>) -> Json<VoiceStatus> {
+    Json(state.voice.status().await)
+}
+
+async fn voice_start_handler(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    state
+        .voice
+        .start_listening()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let status = state.voice.status().await;
+    Ok(Json(serde_json::to_value(status).unwrap_or_default()))
+}
+
+async fn voice_stop_handler(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let result = state
+        .voice
+        .stop_listening()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::json!({
+        "status": "ok",
+        "transcription": result,
+    })))
+}
+
+async fn voice_cancel_handler(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    state
+        .voice
+        .cancel()
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::json!({ "status": "cancelled" })))
+}
+
+async fn voice_audio_handler(
+    State(state): State<AppState>,
+    Json(req): Json<PushAudioRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let res = state
+        .voice
+        .push_audio_frame(&req.samples)
+        .await
+        .map_err(|e| match e {
+            edith_voice::VoiceError::MicrophoneClosed(s) => {
+                (StatusCode::BAD_REQUEST, format!("Microphone closed in state {s:?}"))
+            }
+            _ => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        })?;
+
+    Ok(Json(serde_json::json!({
+        "accepted": true,
+        "transcription": res,
+    })))
+}
+
+async fn voice_tts_handler(
+    State(state): State<AppState>,
+    Json(req): Json<TtsRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let audio = state
+        .voice
+        .speak(&req.text)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "duration_ms": audio.duration_ms,
+        "sample_rate": audio.sample_rate,
+        "samples_count": audio.pcm_samples.len(),
+    })))
 }
 
 #[cfg(test)]

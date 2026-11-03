@@ -87,9 +87,22 @@
 
 | Task ID | Component | Description | Status | Verification Criteria |
 |---------|-----------|-------------|--------|-----------------------|
-| **TSK-801** | `edith-voice` | Audio buffer and capture abstraction (16 kHz mono ring buffer, PCM frames) | In Progress | Audio ring buffer and framing tests pass |
-| **TSK-802** | `edith-voice` | VAD (Voice Activity Detection) state machine (`Idle` -> `Listening` -> `Thinking` -> `Speaking`) with mic privacy guarantees | In Progress | State machine transitions and mic closure verified |
-| **TSK-803** | `edith-voice` | ASR pipeline abstraction with Whisper/faster-whisper inference or local transcription provider | In Progress | Transcription tests pass with audio sample |
-| **TSK-804** | `edith-voice` | TTS pipeline abstraction for speech synthesis with streaming audio frames | In Progress | Speech generation interface verified |
-| **TSK-805** | `edith-api` | Voice session management, audio stream intake, and voice event broadcasting (`voice.state_changed`, `voice.transcription`) | In Progress | API voice session and WebSocket events verified |
+| **TSK-801** | `edith-voice` | Audio buffer and capture abstraction (16 kHz mono ring buffer, PCM frames) | **Completed** | Audio ring buffer and framing tests pass |
+| **TSK-802** | `edith-voice` | VAD (Voice Activity Detection) state machine (`Idle` -> `Listening` -> `Thinking` -> `Speaking`) with mic privacy guarantees | **Completed** | State machine transitions and mic closure verified |
+| **TSK-803** | `edith-voice` | ASR pipeline abstraction with Whisper/faster-whisper inference or local transcription provider | **Completed** | Transcription tests pass with audio sample |
+| **TSK-804** | `edith-voice` | TTS pipeline abstraction for speech synthesis with streaming audio frames and sentence segmenter | **Completed** | Speech generation interface verified |
+| **TSK-805** | `edith-api` | Voice session management, audio stream intake, and voice event broadcasting (`voice.state_changed`, `voice.transcription`) | **Completed** | API voice session and WebSocket events verified |
+
+---
+
+## Epic 9: Search & Research Infrastructure (Phase 9)
+
+| Task ID | Component | Description | Status | Verification Criteria |
+|---------|-----------|-------------|--------|-----------------------|
+| **TSK-901** | `edith-search` | Search provider trait and result representation (`SearchResult`, snippets, URLs, engine metadata) | Planned | Unit tests for search models and results pass |
+| **TSK-902** | `edith-search` | DuckDuckGo / SearXNG search engine adapter with rate limiting and timeout management | Planned | Search integration tests return structured results |
+| **TSK-903** | `edith-search` | Web page content extractor and reader (HTML -> clean markdown / plain text, readable text extraction) | Planned | Extraction tests against real/fixture HTML pass |
+| **TSK-904** | `edith-tools` | Register search and web fetch capabilities (`web.search`, `web.fetch`) into `ToolRegistry` with `PolicyEngine` controls | Planned | Security policy blocks private LAN / local IP targets |
+| **TSK-905** | `edith-api` | Search endpoints (`POST /v1/search`, `POST /v1/search/fetch`) and research task orchestration | Planned | API integration tests pass |
+
 
