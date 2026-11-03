@@ -63,6 +63,7 @@
     - `tests/api_integration_tests.rs::test_session_and_turn_crud_endpoints`: PASSED (Full CRUD: create session, get session, patch session title, append turn, get turn, patch turn content, delete turn, delete session with child turn cascade cleanup)
     - `tests/api_integration_tests.rs::test_cancellation_endpoint`: PASSED (`POST /v1/sessions/{id}/cancel` invokes active CancellationToken and returns cancellation status)
     - `tests/api_integration_tests.rs::test_tools_and_capabilities_endpoint`: PASSED (`GET /v1/tools` returns all 5 registered tools with schemas and autonomy classes)
+    - `tests/api_integration_tests.rs::test_memory_items_endpoints_lifecycle`: PASSED (Full memory lifecycle over REST: create semantic item, list, search, patch confirmation, and delete)
   - `edith-tools`:
     - `policy::tests::test_blocked_tool_denied`: PASSED (Blocked tools are denied outright)
     - `policy::tests::test_dangerous_path_denied`: PASSED (Access to `/etc/shadow` and sensitive paths is strictly denied)
@@ -76,6 +77,12 @@
     - `tests::test_jsonrpc_request_serialization`: PASSED (JSON-RPC 2.0 request formatting)
     - `tests::test_mcp_tool_definition_deserialization`: PASSED (MCP tool definition and schema parsing)
     - `tests::test_tool_call_result_parsing`: PASSED (MCP content block and error parsing)
+  - `edith-memory`:
+    - `provenance::tests::test_can_state_as_fact`: PASSED (Only explicit and confirmed facts can be stated without hedging)
+    - `provenance::tests::test_confidence_clamping`: PASSED (Inferred facts clamped to <= 0.80, confirmed promoted to >= 0.95)
+    - `provenance::tests::test_secret_detection_rejects_api_keys`: PASSED (API keys, JWT tokens, and private keys rejected)
+    - `service::tests::test_working_context_with_ttl`: PASSED (Task working context persists with expiration TTL)
+    - `service::tests::test_memory_service_semantic_and_confirmation`: PASSED (Semantic facts, confirmation promotion, and prompt formatting)
   - `edith-agent`:
     - `executor::tests::test_execution_engine_real_tool_dispatch`: PASSED (ExecutionEngine executes plan with native datetime and echo commands)
 
@@ -102,3 +109,7 @@
   - **Tools and Capabilities Inspection (Phase 6)**:
     - Endpoints: `GET /v1/tools` and `GET /v1/capabilities` with Bearer auth token.
     - Result: Successfully enumerated 5 registered native tools (`datetime.now`, `fs.list_dir`, `fs.read_file`, `fs.write_file`, `system.execute_command`) complete with input JSON schemas, side effects, and policy autonomy classifications.
+  - **Persistent Memory & Security Gatekeeper (Phase 7)**:
+    - `POST /v1/memory/items`: successfully created explicit semantic fact `"Owner timezone is Asia/Dhaka"` (persisted in SQLite `memory_items` table).
+    - `GET /v1/memory/items?q=Dhaka`: verified full-text retrieval returning confirmed item.
+    - Secret Injection Rejection: verified that sending an API key payload (`sk-...`) returns a 400 Bad Request rejection (`Secret data detected in memory payload`), proving security policy compliance.

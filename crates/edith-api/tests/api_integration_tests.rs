@@ -327,3 +327,123 @@ async fn test_tools_and_capabilities_endpoint() {
     assert!(tools.iter().any(|t| t["name"] == "system.execute_command"));
     assert!(tools.iter().any(|t| t["name"] == "datetime.now"));
 }
+
+#[tokio::test]
+async fn test_memory_items_endpoints_lifecycle() {
+    let storage = Storage::open_in_memory().unwrap();
+    let event_bus = EventBus::new(16);
+    let models = ProviderRegistry::new();
+    let state = AppState::new(storage.clone(), event_bus, models, None);
+    let app = create_router(state);
+
+    // 1. Create Memory Item via POST /v1/memory/items
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/memory/items")
+                .header("Content-Type", "application/json")
+                .body(Body::from(
+                    r#"{"content": "Primary language is Rust", "provenance": "explicit", "confidence": 0.95}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let item_val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    let memory_id = item_val["id"].as_str().unwrap().to_string();
+    assert_eq!(item_val["content"], "Primary language is Rust");
+
+    // 2. List Memory Items via GET /v1/memory/items
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/memory/items?category=semantic")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let list_val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    let arr = list_val.as_array().unwrap();
+    assert!(arr.iter().any(|m| m["id"] == memory_id));
+
+    // 3. Search Memory Items via GET /v1/memory/items?q=Rust
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/memory/items?q=Rust")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let search_val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(search_val.as_array().unwrap().len(), 1);
+
+    // 4. Update Memory Item via PATCH /v1/memory/items/{id}
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PATCH")
+                .uri(format!("/v1/memory/items/{memory_id}"))
+                .header("Content-Type", "application/json")
+                .body(Body::from(r#"{"content": "Primary language is Modern Rust", "user_confirmed": true}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let updated_val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(updated_val["content"], "Primary language is Modern Rust");
+    assert_eq!(updated_val["user_confirmed"], true);
+
+    // 5. Delete Memory Item via DELETE /v1/memory/items/{id}
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/v1/memory/items/{memory_id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(storage.get_memory_item(&memory_id).await.unwrap().is_none());
+}

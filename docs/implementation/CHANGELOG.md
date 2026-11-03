@@ -1,5 +1,32 @@
 # EDITH 2.0 — Engineering Changelog
 
+## [0.7.0] - 2026-11-03
+
+### Phase 7: Persistent Memory
+- Database Migration 0003:
+  - Added embedded SQLite migration `0003_memory_enhancements.sql` enhancing `memory_items` (`updated_at`, `expires_at`, `content_hash`) and creating `memory_sources` table.
+  - Implemented async CRUD, full-text search, and pagination in `edith-storage`: `create_memory_item`, `get_memory_item`, `list_memory_items`, `search_memory_items`, `update_memory_item`, and `delete_memory_item`.
+- Created crate [`crates/edith-memory`](crates/edith-memory):
+  - Implemented `MemoryGatekeeper` (`provenance.rs`):
+    - Content validation and credential protection: intercepts and rejects sensitive credentials (`DataClass::Secret`, e.g. API keys, JWT bearer tokens, SSH/RSA private keys).
+    - Enforces confidence clamping: `Inferred` facts capped at 0.80, `Assumption` capped at 0.50, and confirmed facts elevated to >= 0.95.
+    - `can_state_as_fact` rule: guarantees inferred facts are never stated as firm facts without user confirmation.
+  - Implemented `MemoryService` (`service.rs`):
+    - Four memory categories: Episodic, Semantic, Procedural, and Working.
+    - Working context with expiration TTL.
+    - Memory confirmation: elevates unconfirmed/inferred memories to explicit facts.
+    - Dynamic prompt context generation: formats active confirmed facts into bullet lists for model context.
+- Integrated Persistent Memory into Agent Runtime and API:
+  - `AgentRuntime` now fetches active memories and injects them directly into `ContextBuilder` working context.
+  - Completed tasks and conversational turns automatically log episodic memory events.
+  - Added memory endpoints to `edith-api`: `GET /v1/memory/items`, `POST /v1/memory/items`, `PATCH /v1/memory/items/{id}`, and `DELETE /v1/memory/items/{id}`.
+- Verification & Testing:
+  - 6 new unit and integration tests added across `edith-memory`, `edith-storage`, and `edith-api`.
+  - Full workspace test suite passes with **56 tests passing** across all 10 crates.
+  - Live daemon tested with curl: `POST /v1/memory/items` persists facts in SQLite, `GET /v1/memory/items?q=...` performs keyword search, and secret injection attempts are rejected with 400 Bad Request.
+
+---
+
 ## [0.6.0] - 2026-11-03
 
 ### Phase 6: Tool & MCP Infrastructure

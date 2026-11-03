@@ -11,6 +11,7 @@ edith-storage.workspace = true
 edith-models.workspace = true
 edith-agent.workspace = true
 edith-tools.workspace = true
+edith-memory.workspace = true
 tokio.workspace = true
 axum.workspace = true
 tower-http.workspace = true

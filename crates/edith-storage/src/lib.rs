@@ -10,6 +10,7 @@ use tracing::info;
 
 pub const MIGRATION_0001: &str = include_str!("../migrations/0001_initial_schema.sql");
 pub const MIGRATION_0002: &str = include_str!("../migrations/0002_add_thinking_to_turns.sql");
+pub const MIGRATION_0003: &str = include_str!("../migrations/0003_memory_enhancements.sql");
 
 #[derive(Clone)]
 pub struct Storage {
@@ -77,6 +78,24 @@ pub struct TurnRecord {
     pub thinking: Option<String>,
     pub route_id: Option<String>,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryItemRecord {
+    pub id: String,
+    pub category: String,
+    pub content: String,
+    pub structured: Option<String>,
+    pub provenance: String,
+    pub confidence: f32,
+    pub importance: f32,
+    pub user_confirmed: bool,
+    pub status: String,
+    pub superseded_by: Option<String>,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+    pub expires_at: Option<String>,
+    pub content_hash: Option<String>,
 }
 
 impl Storage {
@@ -168,6 +187,16 @@ impl Storage {
                 params![2, "0002_add_thinking_to_turns", Utc::now().to_rfc3339()],
             )
             .map_err(|e| EdithError::Storage(format!("Failed to record migration 0002: {e}")))?;
+        }
+
+        if !applied_versions.contains(&3) {
+            conn.execute_batch(MIGRATION_0003)
+                .map_err(|e| EdithError::Storage(format!("Failed to execute migration 0003: {e}")))?;
+            conn.execute(
+                "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, ?3)",
+                params![3, "0003_memory_enhancements", Utc::now().to_rfc3339()],
+            )
+            .map_err(|e| EdithError::Storage(format!("Failed to record migration 0003: {e}")))?;
         }
 
         info!("Storage migrations completed successfully");
@@ -790,6 +819,350 @@ impl Storage {
         .await
         .map_err(|e| EdithError::Internal(e.to_string()))?
     }
+
+    // --- Memory Repository ---
+
+    pub async fn create_memory_item(
+        &self,
+        category: &str,
+        content: &str,
+        structured: Option<&str>,
+        provenance: &str,
+        confidence: f32,
+        importance: f32,
+        user_confirmed: bool,
+        status: &str,
+        expires_at: Option<&str>,
+        content_hash: Option<&str>,
+    ) -> Result<MemoryItemRecord> {
+        let pool = self.pool.clone();
+        let id = Id::new().to_string();
+        let category = category.to_string();
+        let content = content.to_string();
+        let structured = structured.map(|s| s.to_string());
+        let provenance = provenance.to_string();
+        let status = status.to_string();
+        let now = Utc::now().to_rfc3339();
+        let expires_at = expires_at.map(|s| s.to_string());
+        let content_hash = content_hash.map(|s| s.to_string());
+        let user_confirmed_int = if user_confirmed { 1 } else { 0 };
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool
+                .get()
+                .map_err(|e| EdithError::Storage(format!("Pool error: {e}")))?;
+
+            conn.execute(
+                "INSERT INTO memory_items (id, category, content, structured, provenance, confidence, importance, user_confirmed, status, created_at, updated_at, expires_at, content_hash)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                params![
+                    id,
+                    category,
+                    content,
+                    structured,
+                    provenance,
+                    confidence,
+                    importance,
+                    user_confirmed_int,
+                    status,
+                    now,
+                    now,
+                    expires_at,
+                    content_hash
+                ],
+            )
+            .map_err(|e| EdithError::Storage(format!("Failed to insert memory item: {e}")))?;
+
+            Ok(MemoryItemRecord {
+                id,
+                category,
+                content,
+                structured,
+                provenance,
+                confidence,
+                importance,
+                user_confirmed,
+                status,
+                superseded_by: None,
+                created_at: now.clone(),
+                updated_at: Some(now),
+                expires_at,
+                content_hash,
+            })
+        })
+        .await
+        .map_err(|e| EdithError::Internal(e.to_string()))?
+    }
+
+    pub async fn get_memory_item(&self, id: &str) -> Result<Option<MemoryItemRecord>> {
+        let pool = self.pool.clone();
+        let id = id.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool
+                .get()
+                .map_err(|e| EdithError::Storage(format!("Pool error: {e}")))?;
+
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, category, content, structured, provenance, confidence, importance, user_confirmed, status, superseded_by, created_at, updated_at, expires_at, content_hash
+                     FROM memory_items WHERE id = ?1",
+                )
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+
+            let mut rows = stmt
+                .query_map(params![id], |row| {
+                    let user_confirmed_int: i32 = row.get(7)?;
+                    Ok(MemoryItemRecord {
+                        id: row.get(0)?,
+                        category: row.get(1)?,
+                        content: row.get(2)?,
+                        structured: row.get(3)?,
+                        provenance: row.get(4)?,
+                        confidence: row.get(5)?,
+                        importance: row.get(6)?,
+                        user_confirmed: user_confirmed_int == 1,
+                        status: row.get(8)?,
+                        superseded_by: row.get(9)?,
+                        created_at: row.get(10)?,
+                        updated_at: row.get(11)?,
+                        expires_at: row.get(12)?,
+                        content_hash: row.get(13)?,
+                    })
+                })
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+
+            match rows.next() {
+                Some(r) => Ok(Some(r.map_err(|e| EdithError::Storage(e.to_string()))?)),
+                None => Ok(None),
+            }
+        })
+        .await
+        .map_err(|e| EdithError::Internal(e.to_string()))?
+    }
+
+    pub async fn list_memory_items(
+        &self,
+        category: Option<&str>,
+        status: Option<&str>,
+    ) -> Result<Vec<MemoryItemRecord>> {
+        let pool = self.pool.clone();
+        let category = category.map(|s| s.to_string());
+        let status = status.map(|s| s.to_string());
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool
+                .get()
+                .map_err(|e| EdithError::Storage(format!("Pool error: {e}")))?;
+
+            let mut query = "SELECT id, category, content, structured, provenance, confidence, importance, user_confirmed, status, superseded_by, created_at, updated_at, expires_at, content_hash FROM memory_items WHERE 1=1".to_string();
+            let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+            if let Some(ref cat) = category {
+                query.push_str(" AND category = ?");
+                params_vec.push(Box::new(cat.clone()));
+            }
+
+            if let Some(ref st) = status {
+                query.push_str(" AND status = ?");
+                params_vec.push(Box::new(st.clone()));
+            }
+
+            query.push_str(" ORDER BY importance DESC, created_at DESC");
+
+            let mut stmt = conn.prepare(&query).map_err(|e| EdithError::Storage(e.to_string()))?;
+            let params_slice: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|b| b.as_ref()).collect();
+
+            let rows = stmt
+                .query_map(params_slice.as_slice(), |row| {
+                    let user_confirmed_int: i32 = row.get(7)?;
+                    Ok(MemoryItemRecord {
+                        id: row.get(0)?,
+                        category: row.get(1)?,
+                        content: row.get(2)?,
+                        structured: row.get(3)?,
+                        provenance: row.get(4)?,
+                        confidence: row.get(5)?,
+                        importance: row.get(6)?,
+                        user_confirmed: user_confirmed_int == 1,
+                        status: row.get(8)?,
+                        superseded_by: row.get(9)?,
+                        created_at: row.get(10)?,
+                        updated_at: row.get(11)?,
+                        expires_at: row.get(12)?,
+                        content_hash: row.get(13)?,
+                    })
+                })
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+
+            let mut list = Vec::new();
+            for r in rows {
+                list.push(r.map_err(|e| EdithError::Storage(e.to_string()))?);
+            }
+            Ok(list)
+        })
+        .await
+        .map_err(|e| EdithError::Internal(e.to_string()))?
+    }
+
+    pub async fn search_memory_items(&self, query: &str) -> Result<Vec<MemoryItemRecord>> {
+        let pool = self.pool.clone();
+        let search_pattern = format!("%{}%", query);
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool
+                .get()
+                .map_err(|e| EdithError::Storage(format!("Pool error: {e}")))?;
+
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, category, content, structured, provenance, confidence, importance, user_confirmed, status, superseded_by, created_at, updated_at, expires_at, content_hash
+                     FROM memory_items
+                     WHERE content LIKE ?1 AND status = 'active'
+                     ORDER BY importance DESC, confidence DESC",
+                )
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+
+            let rows = stmt
+                .query_map(params![search_pattern], |row| {
+                    let user_confirmed_int: i32 = row.get(7)?;
+                    Ok(MemoryItemRecord {
+                        id: row.get(0)?,
+                        category: row.get(1)?,
+                        content: row.get(2)?,
+                        structured: row.get(3)?,
+                        provenance: row.get(4)?,
+                        confidence: row.get(5)?,
+                        importance: row.get(6)?,
+                        user_confirmed: user_confirmed_int == 1,
+                        status: row.get(8)?,
+                        superseded_by: row.get(9)?,
+                        created_at: row.get(10)?,
+                        updated_at: row.get(11)?,
+                        expires_at: row.get(12)?,
+                        content_hash: row.get(13)?,
+                    })
+                })
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+
+            let mut list = Vec::new();
+            for r in rows {
+                list.push(r.map_err(|e| EdithError::Storage(e.to_string()))?);
+            }
+            Ok(list)
+        })
+        .await
+        .map_err(|e| EdithError::Internal(e.to_string()))?
+    }
+
+    pub async fn update_memory_item(
+        &self,
+        id: &str,
+        content: Option<&str>,
+        status: Option<&str>,
+        confidence: Option<f32>,
+        user_confirmed: Option<bool>,
+    ) -> Result<Option<MemoryItemRecord>> {
+        let pool = self.pool.clone();
+        let id = id.to_string();
+        let content = content.map(|s| s.to_string());
+        let status = status.map(|s| s.to_string());
+        let now = Utc::now().to_rfc3339();
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool
+                .get()
+                .map_err(|e| EdithError::Storage(format!("Pool error: {e}")))?;
+
+            if let Some(ref c) = content {
+                conn.execute(
+                    "UPDATE memory_items SET content = ?1, updated_at = ?2 WHERE id = ?3",
+                    params![c, now, id],
+                )
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+            }
+
+            if let Some(ref s) = status {
+                conn.execute(
+                    "UPDATE memory_items SET status = ?1, updated_at = ?2 WHERE id = ?3",
+                    params![s, now, id],
+                )
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+            }
+
+            if let Some(conf) = confidence {
+                conn.execute(
+                    "UPDATE memory_items SET confidence = ?1, updated_at = ?2 WHERE id = ?3",
+                    params![conf, now, id],
+                )
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+            }
+
+            if let Some(uc) = user_confirmed {
+                let uc_int = if uc { 1 } else { 0 };
+                conn.execute(
+                    "UPDATE memory_items SET user_confirmed = ?1, updated_at = ?2 WHERE id = ?3",
+                    params![uc_int, now, id],
+                )
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+            }
+
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, category, content, structured, provenance, confidence, importance, user_confirmed, status, superseded_by, created_at, updated_at, expires_at, content_hash
+                     FROM memory_items WHERE id = ?1",
+                )
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+
+            let mut rows = stmt
+                .query_map(params![id], |row| {
+                    let user_confirmed_int: i32 = row.get(7)?;
+                    Ok(MemoryItemRecord {
+                        id: row.get(0)?,
+                        category: row.get(1)?,
+                        content: row.get(2)?,
+                        structured: row.get(3)?,
+                        provenance: row.get(4)?,
+                        confidence: row.get(5)?,
+                        importance: row.get(6)?,
+                        user_confirmed: user_confirmed_int == 1,
+                        status: row.get(8)?,
+                        superseded_by: row.get(9)?,
+                        created_at: row.get(10)?,
+                        updated_at: row.get(11)?,
+                        expires_at: row.get(12)?,
+                        content_hash: row.get(13)?,
+                    })
+                })
+                .map_err(|e| EdithError::Storage(e.to_string()))?;
+
+            match rows.next() {
+                Some(r) => Ok(Some(r.map_err(|e| EdithError::Storage(e.to_string()))?)),
+                None => Ok(None),
+            }
+        })
+        .await
+        .map_err(|e| EdithError::Internal(e.to_string()))?
+    }
+
+    pub async fn delete_memory_item(&self, id: &str) -> Result<bool> {
+        let pool = self.pool.clone();
+        let id = id.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            let conn = pool
+                .get()
+                .map_err(|e| EdithError::Storage(format!("Pool error: {e}")))?;
+
+            let affected = conn
+                .execute("DELETE FROM memory_items WHERE id = ?1", params![id])
+                .map_err(|e| EdithError::Storage(format!("Failed to delete memory item: {e}")))?;
+
+            Ok(affected > 0)
+        })
+        .await
+        .map_err(|e| EdithError::Internal(e.to_string()))?
+    }
 }
 
 #[cfg(test)]
@@ -860,7 +1233,44 @@ mod tests {
         assert_eq!(event.kind, "task.state_changed");
         assert_eq!(event.seq, 1);
 
-        // 5. Deletion
+        // 5. Memory items CRUD and search
+        let memory = storage
+            .create_memory_item(
+                "semantic",
+                "Owner timezone is Asia/Dhaka",
+                Some(r#"{"timezone": "Asia/Dhaka"}"#),
+                "explicit",
+                0.95,
+                0.8,
+                true,
+                "active",
+                None,
+                Some("hash_tz_123"),
+            )
+            .await
+            .unwrap();
+        assert_eq!(memory.category, "semantic");
+        assert_eq!(memory.content, "Owner timezone is Asia/Dhaka");
+        assert!(memory.user_confirmed);
+
+        let fetched_mem = storage.get_memory_item(&memory.id).await.unwrap().unwrap();
+        assert_eq!(fetched_mem.id, memory.id);
+
+        let search_res = storage.search_memory_items("Dhaka").await.unwrap();
+        assert_eq!(search_res.len(), 1);
+        assert_eq!(search_res[0].id, memory.id);
+
+        let updated_mem = storage
+            .update_memory_item(&memory.id, Some("Owner preferred timezone is Asia/Dhaka"), None, None, None)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated_mem.content, "Owner preferred timezone is Asia/Dhaka");
+
+        // 6. Deletion
+        storage.delete_memory_item(&memory.id).await.unwrap();
+        assert!(storage.get_memory_item(&memory.id).await.unwrap().is_none());
+
         storage.delete_turn(&turn.id).await.unwrap();
         assert!(storage.get_turn(&turn.id).await.unwrap().is_none());
 

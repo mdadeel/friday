@@ -4,6 +4,7 @@ use crate::plan::{Plan, PlanStep};
 use crate::state_machine::TaskStateMachine;
 use edith_core::{EdithError, TaskState, VerificationMode};
 use edith_events::{EventBus, EventEnvelope};
+use edith_memory::MemoryService;
 use edith_models::{ChatMessage, ModelProvider, ModelRequest, ProviderRegistry};
 use edith_router::{ModelRouter, RouteDecision};
 use edith_storage::Storage;
@@ -30,19 +31,26 @@ pub struct AgentRuntime {
     models: ProviderRegistry,
     router: Arc<ModelRouter>,
     executor: Arc<ExecutionEngine>,
+    memory: Arc<MemoryService>,
 }
 
 impl AgentRuntime {
     pub fn new(storage: Storage, event_bus: EventBus, models: ProviderRegistry) -> Self {
         let executor = Arc::new(ExecutionEngine::new(event_bus.clone()));
         let router = Arc::new(ModelRouter::new(storage.clone(), event_bus.clone(), models.clone()));
+        let memory = Arc::new(MemoryService::new(storage.clone(), event_bus.clone()));
         Self {
             storage,
             event_bus,
             models,
             router,
             executor,
+            memory,
         }
+    }
+
+    pub fn memory(&self) -> Arc<MemoryService> {
+        self.memory.clone()
     }
 
     pub fn executor(&self) -> Arc<ExecutionEngine> {
@@ -88,10 +96,15 @@ impl AgentRuntime {
             .await?;
         self.publish_task_event(task_id, "task.state_changed", "planning", session_id);
 
-        // 2. Fetch turns & build context with available tool capabilities
+        // 2. Fetch turns & build context with available tool capabilities and persistent memory
         let turns = self.storage.list_turns(session_id).await.unwrap_or_default();
         let tools_prompt = self.format_tools_prompt();
-        let context_builder = ContextBuilder::new().with_tools_prompt(tools_prompt);
+        let memory_context = self.memory.get_context_for_prompt(10).await.unwrap_or_default();
+
+        let mut context_builder = ContextBuilder::new().with_tools_prompt(tools_prompt);
+        if !memory_context.is_empty() {
+            context_builder = context_builder.with_working_context(memory_context);
+        }
         let messages = context_builder.build(&turns);
 
         // 3. Routing decision (Tier 0 heuristic or model selection)
@@ -259,6 +272,12 @@ impl AgentRuntime {
             .append_turn(session_id, "assistant", &response_summary, None, None)
             .await?;
 
+        // Record episodic memory of plan completion
+        let _ = self
+            .memory
+            .record_episodic_event(session_id, &format!("Objective '{}' completed: {}", objective, response_summary))
+            .await;
+
         Ok(AgentExecutionResult {
             task_id: task_id.to_string(),
             final_state: TaskState::Completed,
@@ -392,6 +411,12 @@ impl AgentRuntime {
             )
             .with_task(task_id),
         );
+
+        // Record episodic memory of turn interaction
+        let _ = self
+            .memory
+            .record_episodic_event(session_id, &format!("Completed response in session: {}", session_id))
+            .await;
 
         Ok(AgentExecutionResult {
             task_id: task_id.to_string(),

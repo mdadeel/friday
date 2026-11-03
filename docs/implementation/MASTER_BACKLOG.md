@@ -75,8 +75,21 @@
 
 | Task ID | Component | Description | Status | Verification Criteria |
 |---------|-----------|-------------|--------|-----------------------|
-| **TSK-701** | `edith-storage` | Migration `0003_memory_tables.sql` for semantic, episodic, procedural, and working memory | Planned | Database migration executes cleanly |
-| **TSK-702** | `edith-memory` | Provenance classification engine (explicit, inferred, temporary, assumption) | Planned | Unit tests verify provenance rejection/acceptance rules |
-| **TSK-703** | `edith-memory` | Memory facade service coordinating working scratchpad, episodic recalls, and semantic facts | Planned | Memory CRUD & search unit tests pass |
-| **TSK-704** | `edith-agent` | ContextBuilder integration: inject accepted semantic facts & episodic memories within token budgets | Planned | ContextBuilder tests pass with memory injection |
-| **TSK-705** | `edith-api` | Memory management endpoints (`GET /v1/memory/items`, `PATCH /v1/memory/items/{id}`, `DELETE /v1/memory/items/{id}`) | Planned | API integration tests pass |
+| **TSK-701** | `edith-storage` | Migration `0003_memory_enhancements.sql` for semantic, episodic, procedural, and working memory | **Completed** | Database migration executes cleanly |
+| **TSK-702** | `edith-memory` | Provenance classification engine (explicit, inferred, temporary, assumption, secret gatekeeper) | **Completed** | Unit tests verify provenance rejection/acceptance rules |
+| **TSK-703** | `edith-memory` | Memory facade service coordinating working scratchpad, episodic recalls, and semantic facts | **Completed** | Memory CRUD & search unit tests pass |
+| **TSK-704** | `edith-agent` | ContextBuilder integration: inject accepted semantic facts & episodic memories within token budgets | **Completed** | ContextBuilder tests pass with memory injection |
+| **TSK-705** | `edith-api` | Memory management endpoints (`GET /v1/memory/items`, `POST /v1/memory/items`, `PATCH /v1/memory/items/{id}`, `DELETE /v1/memory/items/{id}`) | **Completed** | API integration tests pass |
+
+---
+
+## Epic 8: Voice Engine (Phase 8)
+
+| Task ID | Component | Description | Status | Verification Criteria |
+|---------|-----------|-------------|--------|-----------------------|
+| **TSK-801** | `edith-voice` | Audio buffer and capture abstraction (16 kHz mono ring buffer, PCM frames) | In Progress | Audio ring buffer and framing tests pass |
+| **TSK-802** | `edith-voice` | VAD (Voice Activity Detection) state machine (`Idle` -> `Listening` -> `Thinking` -> `Speaking`) with mic privacy guarantees | In Progress | State machine transitions and mic closure verified |
+| **TSK-803** | `edith-voice` | ASR pipeline abstraction with Whisper/faster-whisper inference or local transcription provider | In Progress | Transcription tests pass with audio sample |
+| **TSK-804** | `edith-voice` | TTS pipeline abstraction for speech synthesis with streaming audio frames | In Progress | Speech generation interface verified |
+| **TSK-805** | `edith-api` | Voice session management, audio stream intake, and voice event broadcasting (`voice.state_changed`, `voice.transcription`) | In Progress | API voice session and WebSocket events verified |
+

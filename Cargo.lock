@@ -253,6 +253,7 @@ dependencies = [
  "chrono",
  "edith-core",
  "edith-events",
+ "edith-memory",
  "edith-models",
  "edith-router",
  "edith-storage",
@@ -276,6 +277,7 @@ dependencies = [
  "edith-agent",
  "edith-core",
  "edith-events",
+ "edith-memory",
  "edith-models",
  "edith-storage",
  "edith-tools",
@@ -349,6 +351,24 @@ dependencies = [
  "edith-tools",
  "serde",
  "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "edith-memory"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "edith-core",
+ "edith-events",
+ "edith-storage",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
  "tracing",

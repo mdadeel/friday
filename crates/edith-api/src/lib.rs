@@ -1,7 +1,7 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Path, State,
+        Path, Query, State,
     },
     http::{HeaderMap, StatusCode},
     middleware::{self, Next},
@@ -11,7 +11,7 @@ use axum::{
 };
 use chrono::Utc;
 use edith_agent::AgentRuntime;
-use edith_core::{TaskOrigin, TaskPriority, VerificationMode};
+use edith_core::{Provenance, TaskOrigin, TaskPriority, VerificationMode};
 use edith_events::{EventBus, EventEnvelope};
 use edith_models::ProviderRegistry;
 use edith_storage::Storage;
@@ -98,6 +98,31 @@ fn default_source() -> String {
     "text".to_string()
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateMemoryRequest {
+    pub content: String,
+    pub category: Option<String>,
+    pub provenance: Option<String>,
+    pub confidence: Option<f32>,
+    pub importance: Option<f32>,
+    pub structured: Option<Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateMemoryRequest {
+    pub content: Option<String>,
+    pub status: Option<String>,
+    pub confidence: Option<f32>,
+    pub user_confirmed: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListMemoryQuery {
+    pub category: Option<String>,
+    pub status: Option<String>,
+    pub q: Option<String>,
+}
+
 pub fn create_router(state: AppState) -> Router {
     let auth_token = state.auth_token.clone();
 
@@ -124,6 +149,14 @@ pub fn create_router(state: AppState) -> Router {
         .route("/v1/providers", get(list_providers_handler))
         .route("/v1/tools", get(list_tools_handler))
         .route("/v1/capabilities", get(list_tools_handler))
+        .route(
+            "/v1/memory/items",
+            get(list_memory_items_handler).post(create_memory_item_handler),
+        )
+        .route(
+            "/v1/memory/items/{id}",
+            axum::routing::patch(update_memory_item_handler).delete(delete_memory_item_handler),
+        )
         .route("/v1/events", get(events_ws_handler))
         .layer(middleware::from_fn(move |headers, req, next| {
             let token = auth_token.clone();
@@ -237,6 +270,88 @@ async fn list_tools_handler(State(state): State<AppState>) -> impl IntoResponse 
         "tools": descriptors,
         "count": descriptors.len(),
     }))
+}
+
+async fn list_memory_items_handler(
+    State(state): State<AppState>,
+    Query(query): Query<ListMemoryQuery>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    if let Some(ref q) = query.q {
+        let results = state
+            .storage
+            .search_memory_items(q)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        return Ok(Json(serde_json::to_value(results).unwrap()));
+    }
+
+    let items = state
+        .storage
+        .list_memory_items(query.category.as_deref(), query.status.as_deref())
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::to_value(items).unwrap()))
+}
+
+async fn create_memory_item_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateMemoryRequest>,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, String)> {
+    let provenance = match payload.provenance.as_deref() {
+        Some("inferred") => Provenance::Inferred,
+        Some("assumption") => Provenance::Assumption,
+        Some("temporary") => Provenance::Temporary,
+        _ => Provenance::Explicit,
+    };
+    let confidence = payload.confidence.unwrap_or(0.90);
+    let importance = payload.importance.unwrap_or(0.50);
+
+    let item = state
+        .agent
+        .memory()
+        .record_semantic_fact(&payload.content, payload.structured, provenance, confidence, importance)
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    Ok((StatusCode::CREATED, Json(serde_json::to_value(item).unwrap())))
+}
+
+async fn update_memory_item_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateMemoryRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let updated = state
+        .storage
+        .update_memory_item(
+            &id,
+            payload.content.as_deref(),
+            payload.status.as_deref(),
+            payload.confidence,
+            payload.user_confirmed,
+        )
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Memory item '{}' not found", id)))?;
+
+    Ok(Json(serde_json::to_value(updated).unwrap()))
+}
+
+async fn delete_memory_item_handler(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let deleted = state
+        .storage
+        .delete_memory_item(&id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if deleted {
+        Ok(StatusCode::OK)
+    } else {
+        Err((StatusCode::NOT_FOUND, format!("Memory item '{}' not found", id)))
+    }
 }
 
 async fn list_sessions_handler(
