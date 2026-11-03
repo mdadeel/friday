@@ -1,0 +1,40 @@
+# EDITH 2.0 — Implementation Status
+**Current Date:** 2026-11-03  
+**Active Milestone:** Phase 3 Completed / Phase 4 Ready  
+**Overall Status:** Active Development
+
+---
+
+## 1. Phase Status Summary
+
+| Phase | Description | Status | Verification | Notes |
+|-------|-------------|--------|--------------|-------|
+| **Phase 0** | Repository & Environment Audit | **Verified Done** | Audit documents created; toolchain validated | Host environment, hardware, Ollama, Whisper audited |
+| **Phase 1** | Rust Workspace & Application Foundation | **Verified Done** | 9 tests pass; live daemon tested | Cargo workspace, Core, Events, Storage, API, Daemon operational |
+| **Phase 2** | Model Provider Infrastructure | **Verified Done** | Live Ollama & Mock tests pass (13 tests total) | `ModelProvider` trait, `OllamaAdapter`, streaming, `ProviderRegistry`, `/v1/providers` |
+| **Phase 3** | Conversation Engine | **Verified Done** | 15 workspace tests pass; live Qwen3 chat tested | Full session/turn CRUD, migration 0002 (thinking column), streaming events (`message.delta`, `message.final`), live thinking extraction, cancellation tokens |
+| **Phase 4** | Agent Runtime & Orchestration | **Ready** | Next milestone | Task state machine, execution lifecycle, context builder |
+| **Phase 5** | Intelligent Model Routing | Planned | Pending Phase 4 | Tiers 0–4, complexity matcher |
+| **Phase 6** | Tool & MCP Infrastructure | Planned | Pending Phase 5 | Registry, execution, permissions, MCP |
+| **Phase 7** | Persistent Memory | Planned | Pending Phase 6 | Episodic, semantic, procedural, working |
+| **Phase 8** | Voice Engine | Planned | Pending Phase 7 | Audio capture, Faster-Whisper, VAD |
+| **Phase 9** | Search & Research Infrastructure | Planned | Pending Phase 8 | Search providers, evidence extraction |
+| **Phase 10** | Desktop Environment Integrations | Planned | Pending Phase 9 | Linux FS, terminal, processes |
+| **Phase 11** | Full Interface & Desktop Shell | Planned | Pending Phase 10 | Tauri desktop shell & prototype hookup |
+| **Phase 12** | Testing, Hardening & Evaluation | Planned | Continuous | Unit, contract, benchmark suites |
+
+---
+
+## 2. Component Implementation State
+
+| Component / Crate | Designed | Scaffolded | Implemented | Tested | Verified |
+|-------------------|----------|------------|-------------|--------|----------|
+| `docs/edith/` (Specs) | YES | YES | YES | YES | YES |
+| `prototype/` (Web UI) | YES | YES | YES | YES (19 tests) | YES |
+| `Cargo.toml` (Workspace) | YES | YES | YES | YES | YES |
+| `crates/edith-core` | YES | YES | YES | YES (3 tests) | YES |
+| `crates/edith-events` | YES | YES | YES | YES (2 tests) | YES |
+| `crates/edith-storage` | YES | YES | YES | YES (1 test) | YES (Migrations 0001 & 0002) |
+| `crates/edith-models` | YES | YES | YES | YES (4 tests) | YES (Live Ollama Qwen3) |
+| `crates/edith-api` | YES | YES | YES | YES (5 tests) | YES (Live HTTP & Streaming) |
+| `apps/daemon` | YES | YES | YES | YES (Live run) | YES (Dual Unix & TCP socket) |

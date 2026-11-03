@@ -1,0 +1,99 @@
+# EDITH 2.0 — Engineering Changelog
+
+## [0.3.0] - 2026-11-03
+
+### Phase 3: Conversation Engine
+- Database Migrations & Turn Schema:
+  - Added embedded SQLite migration `0002_add_thinking_to_turns.sql` adding `thinking TEXT` column to `turns` table.
+  - Updated `edith-storage` migration runner with sequential migration execution and tracking in `schema_migrations`.
+  - Added CRUD methods in `Storage`: `get_session`, `update_session_title`, `delete_session` (with child turn cascade deletion and task unlinking), `get_turn`, `update_turn`, `delete_turn`, and `update_task_state` with completion timestamps.
+- Streaming Conversation Execution Engine:
+  - Integrated `tokio-util` cancellation tokens in `AppState` for in-flight generation cancellation.
+  - Implemented async streaming worker `process_conversation` in `edith-api`:
+    - Retrieves conversation history from storage and constructs chronological `ChatMessage` prompts.
+    - Dynamically selects optimal registered provider (`ollama` with `qwen3:0.6b` or `mock`).
+    - Streams tokens via `complete_stream` and broadcasts `message.delta` events on `EventBus`.
+    - Handles stream cancellation gracefully via `cancel_token.cancelled()`, marking tasks cancelled.
+    - Captures and stores Qwen3 `thinking` separately from conversational response content.
+    - Persists assistant turn in SQLite with thinking and emits `message.final`.
+    - Transitions task state from `discovered` -> `executing` -> `completed` (or `failed` / `cancelled`).
+- API Endpoints:
+  - Added session CRUD: `GET /v1/sessions/{id}`, `PATCH /v1/sessions/{id}`, `DELETE /v1/sessions/{id}`.
+  - Added turn CRUD: `GET /v1/sessions/{id}/turns/{turn_id}`, `PATCH /v1/sessions/{id}/turns/{turn_id}`, `DELETE /v1/sessions/{id}/turns/{turn_id}`.
+  - Added cancellation endpoint: `POST /v1/sessions/{id}/cancel`.
+  - Updated `POST /v1/sessions/{id}/messages` to spawn background worker and return 202 Accepted.
+- Testing & Live Verification:
+  - Added comprehensive integration tests in `crates/edith-api/tests/api_integration_tests.rs`:
+    - `test_end_to_end_conversation_streaming_and_persistence`
+    - `test_session_and_turn_crud_endpoints`
+    - `test_cancellation_endpoint`
+  - All 15 workspace tests pass (`cargo test --workspace`).
+  - Tested live daemon with curl against local Ollama instance (`qwen3:0.6b`), verified real-time token streaming, thinking persistence, and task completion.
+
+---
+
+## [0.2.0] - 2026-11-03
+
+### Phase 2: Model Provider Infrastructure
+- Created crate [`crates/edith-models`](crates/edith-models):
+  - Defined provider-agnostic [`ModelProvider`](crates/edith-models/src/provider.rs) trait supporting `check_health`, non-streaming `complete`, and streaming `complete_stream`.
+  - Implemented core message types: `ChatMessage`, `ModelRequest`, `ModelResponse`, `ModelStreamChunk`, `TokenUsage`, `ModelCapabilities`, and `ProviderHealth`.
+  - Implemented [`MockProvider`](crates/edith-models/src/adapters/mock.rs) for deterministic offline unit testing, failure simulation, and synthetic stream generation.
+  - Implemented [`OllamaAdapter`](crates/edith-models/src/adapters/ollama.rs) connecting directly to the host's local Ollama instance (`http://127.0.0.1:11434`):
+    - Real-time health check and model enumeration via `/api/tags`.
+    - Non-streaming chat completion via `/api/chat` with Qwen3 thinking extraction and token evaluation.
+    - Streaming chat completion with token deltas, thinking deltas, and usage stats.
+  - Implemented [`ProviderRegistry`](crates/edith-models/src/registry.rs) providing thread-safe provider registration, retrieval, and concurrent health checks.
+- Integrated `edith-models` into `edith-api` and `apps/daemon`:
+  - Added `GET /v1/providers` returning live provider health, latency, and available models.
+  - Updated `GET /v1/status` to report live provider status.
+  - Added startup provider probe in `edith-daemon`.
+- Verified test suite:
+  - All 13 Rust workspace tests pass (`cargo test --workspace`).
+  - Real live Ollama integration test (`test_ollama_live_health_and_completion`) passes against local `qwen3:0.6b`.
+
+---
+
+## [0.1.0] - 2026-11-03
+
+### Phase 0: Repository Audit & Environment Verification
+- Completed full audit of existing repository and the 24 Arena.ai design documents.
+- Audited Linux host environment (Ubuntu 26.04.1 LTS, AMD Ryzen 5 5600GT APU, GNOME Wayland).
+- Verified local Ollama instance (`qwen3:0.6b`, `qwen3:4b`, `qwen2.5:3b-instruct`) and cached Faster-Whisper models.
+- Verified and executed prototype test suite (19 tests passing).
+- Documented findings in `docs/implementation/REPOSITORY_AUDIT.md` and `docs/implementation/ARCHITECTURE_GAP_ANALYSIS.md`.
+- Formulated Architecture Decision Records:
+  - `ADR-0001`: Workspace Layout and SQLite Storage Engine Architecture.
+  - `ADR-0002`: Dual Transport Daemon (Unix Domain Socket & Loopback TCP).
+
+### Phase 1: Rust Workspace & Application Foundation
+- Initialized root Cargo workspace with members:
+  - `crates/edith-core`
+  - `crates/edith-events`
+  - `crates/edith-storage`
+  - `crates/edith-api`
+  - `apps/daemon`
+- Implemented `edith-core`:
+  - Domain enums: `TaskState`, `Tier`, `CapabilityKind`, `AutonomyClass`, `Provenance`, `DataClass`, `VerificationMode`, `TaskOrigin`, `TaskPriority`.
+  - Type-safe UUIDv7 identifiers (`Id`).
+  - Configuration schema with TOML loader and environment path resolution.
+  - Core error hierarchy (`EdithError`).
+- Implemented `edith-events`:
+  - `EventEnvelope` with timestamps, task tracking, trace IDs, and JSON payloads.
+  - `EventBus` backed by Tokio broadcast channel with lag detection.
+- Implemented `edith-storage`:
+  - SQLite storage engine in WAL mode with connection pooling (`r2d2`), synchronous=NORMAL, foreign keys enabled.
+  - Embedded migrations (`0001_initial_schema.sql`) for sessions, turns, tasks, task_events, route_decisions, memory_items, and settings.
+  - Async repository methods with Tokio blocking thread pool.
+- Implemented `edith-api`:
+  - Axum HTTP/1.1 and WebSocket router.
+  - Endpoints: `GET /v1/health`, `GET /v1/status`, `GET /v1/sessions`, `POST /v1/sessions`, `GET /v1/sessions/{id}/turns`, `POST /v1/sessions/{id}/messages`, `GET /v1/tasks`, `GET /v1/tasks/{id}`, `GET /v1/events` (WebSocket upgrade).
+  - Bearer token authentication middleware and CORS support.
+- Implemented `apps/daemon` (`edith-daemon`):
+  - Composition root initializing tracing, config, storage, event bus, and listeners.
+  - Dual transport support: Unix domain socket at `$XDG_RUNTIME_DIR/edith/api.sock` (mode 0600) and Loopback TCP at `127.0.0.1:4242`.
+  - Automatic auth token generation and storage in `$XDG_RUNTIME_DIR/edith/token`.
+  - Graceful shutdown on `SIGINT` / `SIGTERM` with socket file cleanup.
+- Verified test suite:
+  - All 9 Rust workspace tests pass (`cargo test --workspace`).
+  - Live daemon tested with curl (`/v1/health`, `/v1/status`, session creation, message submission, task verification).

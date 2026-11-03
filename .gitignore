@@ -1,0 +1,7 @@
+/target
+/data
+node_modules
+*.sock
+*.token
+dist
+build-tests
