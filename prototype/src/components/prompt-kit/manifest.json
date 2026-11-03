@@ -1,0 +1,174 @@
+{
+  "prompt-input": {
+    "dependencies": [],
+    "registryDependencies": [
+      "textarea",
+      "tooltip"
+    ],
+    "files": [
+      "prompt-input.tsx"
+    ]
+  },
+  "chat-container": {
+    "dependencies": [
+      "use-stick-to-bottom"
+    ],
+    "registryDependencies": [],
+    "files": [
+      "chat-container.tsx"
+    ]
+  },
+  "message": {
+    "dependencies": [
+      "react-markdown",
+      "remark-gfm",
+      "shiki",
+      "marked",
+      "remark-breaks"
+    ],
+    "registryDependencies": [
+      "avatar",
+      "tooltip"
+    ],
+    "files": [
+      "message.tsx",
+      "markdown.tsx",
+      "code-block.tsx"
+    ]
+  },
+  "reasoning": {
+    "dependencies": [
+      "lucide-react"
+    ],
+    "registryDependencies": [],
+    "files": [
+      "reasoning.tsx",
+      "markdown.tsx",
+      "response-stream.tsx"
+    ]
+  },
+  "chain-of-thought": {
+    "dependencies": [
+      "lucide-react"
+    ],
+    "registryDependencies": [
+      "collapsible"
+    ],
+    "files": [
+      "chain-of-thought.tsx"
+    ]
+  },
+  "tool": {
+    "dependencies": [
+      "lucide-react"
+    ],
+    "registryDependencies": [
+      "collapsible",
+      "button"
+    ],
+    "files": [
+      "tool.tsx"
+    ]
+  },
+  "source": {
+    "dependencies": [],
+    "registryDependencies": [
+      "hover-card"
+    ],
+    "files": [
+      "source.tsx"
+    ]
+  },
+  "steps": {
+    "dependencies": [],
+    "registryDependencies": [
+      "collapsible"
+    ],
+    "files": [
+      "steps.tsx"
+    ]
+  },
+  "code-block": {
+    "dependencies": [
+      "shiki"
+    ],
+    "registryDependencies": [],
+    "files": [
+      "code-block.tsx"
+    ]
+  },
+  "markdown": {
+    "dependencies": [
+      "react-markdown",
+      "remark-gfm",
+      "shiki",
+      "marked",
+      "remark-breaks"
+    ],
+    "registryDependencies": [],
+    "files": [
+      "markdown.tsx",
+      "code-block.tsx"
+    ]
+  },
+  "loader": {
+    "dependencies": [],
+    "registryDependencies": [
+      "button"
+    ],
+    "files": [
+      "loader.tsx"
+    ]
+  },
+  "scroll-button": {
+    "dependencies": [
+      "class-variance-authority",
+      "lucide-react"
+    ],
+    "registryDependencies": [
+      "button"
+    ],
+    "files": [
+      "scroll-button.tsx"
+    ]
+  },
+  "feedback-bar": {
+    "dependencies": [
+      "lucide-react"
+    ],
+    "registryDependencies": [],
+    "files": [
+      "feedback-bar.tsx"
+    ]
+  },
+  "prompt-suggestion": {
+    "dependencies": [
+      "class-variance-authority",
+      "lucide-react"
+    ],
+    "registryDependencies": [
+      "button"
+    ],
+    "files": [
+      "prompt-suggestion.tsx"
+    ]
+  },
+  "text-shimmer": {
+    "dependencies": [],
+    "registryDependencies": [],
+    "files": [
+      "text-shimmer.tsx"
+    ]
+  },
+  "thinking-bar": {
+    "dependencies": [
+      "lucide-react"
+    ],
+    "registryDependencies": [
+      "text-shimmer"
+    ],
+    "files": [
+      "thinking-bar.tsx"
+    ]
+  }
+}

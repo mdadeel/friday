@@ -1,0 +1,28 @@
+# EDITH 2.0 System Configuration
+
+[server]
+# Socket path for local IPC (mode 0600)
+socket_path = "/tmp/edith/api.sock"
+
+# Loopback TCP endpoint for web prototype and developer tools
+tcp_host = "127.0.0.1"
+tcp_port = 4242
+
+# Transport mode: "both" (Unix socket + TCP), "unix", or "tcp"
+transport = "both"
+
+# Local authentication token
+auth_token = "edith-local-token"
+
+[storage]
+# Local SQLite database file path
+database_path = "data/edith.db"
+pool_size = 4
+
+[models]
+ollama_url = "http://127.0.0.1:11434"
+tier1_model = "qwen3:0.6b"
+tier2_model = "qwen3:4b"
+
+[security]
+max_task_duration_secs = 300

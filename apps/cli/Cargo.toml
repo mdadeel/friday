@@ -1,0 +1,17 @@
+[package]
+name = "edith-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "edith"
+path = "src/main.rs"
+
+[dependencies]
+edith-core = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

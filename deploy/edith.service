@@ -1,0 +1,14 @@
+[Unit]
+Description=EDITH 2.0 Autonomous Personal AI Daemon
+After=network.target sound.target
+
+[Service]
+Type=simple
+ExecStart=%h/.cargo/bin/edith-daemon
+Restart=on-failure
+RestartSec=3s
+Environment=RUST_LOG=info
+Environment=EDITH_CONFIG=%h/.config/edith/edith.toml
+
+[Install]
+WantedBy=default.target

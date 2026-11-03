@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=EDITH 2.0
+GenericName=Personal AI Assistant
+Comment=Autonomous Personal AI Operating System
+Exec=edith-daemon
+Icon=edith-assistant
+Terminal=false
+Categories=Utility;ArtificialIntelligence;AudioVideo;
+StartupNotify=true
