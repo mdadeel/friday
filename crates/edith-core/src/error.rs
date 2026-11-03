@@ -29,6 +29,9 @@ pub enum EdithError {
     #[error("Policy violation: {0}")]
     Policy(String),
 
+    #[error("Tool error: {0}")]
+    Tool(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 

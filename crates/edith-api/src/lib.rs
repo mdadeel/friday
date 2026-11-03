@@ -122,6 +122,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/v1/tasks", get(list_tasks_handler))
         .route("/v1/tasks/{id}", get(get_task_handler))
         .route("/v1/providers", get(list_providers_handler))
+        .route("/v1/tools", get(list_tools_handler))
+        .route("/v1/capabilities", get(list_tools_handler))
         .route("/v1/events", get(events_ws_handler))
         .layer(middleware::from_fn(move |headers, req, next| {
             let token = auth_token.clone();
@@ -227,6 +229,14 @@ async fn list_providers_handler(State(state): State<AppState>) -> Json<Value> {
     }
 
     Json(serde_json::to_value(entries).unwrap())
+}
+
+async fn list_tools_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let descriptors = state.agent.tool_registry().list_descriptors();
+    Json(serde_json::json!({
+        "tools": descriptors,
+        "count": descriptors.len(),
+    }))
 }
 
 async fn list_sessions_handler(

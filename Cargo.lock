@@ -256,6 +256,7 @@ dependencies = [
  "edith-models",
  "edith-router",
  "edith-storage",
+ "edith-tools",
  "futures-util",
  "serde",
  "serde_json",
@@ -277,6 +278,7 @@ dependencies = [
  "edith-events",
  "edith-models",
  "edith-storage",
+ "edith-tools",
  "futures-util",
  "reqwest",
  "serde",
@@ -339,6 +341,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "edith-mcp"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "edith-core",
+ "edith-tools",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "edith-models"
 version = "0.1.0"
 dependencies = [
@@ -383,6 +399,21 @@ dependencies = [
  "r2d2",
  "r2d2_sqlite",
  "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "edith-tools"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "edith-core",
  "serde",
  "serde_json",
  "tempfile",

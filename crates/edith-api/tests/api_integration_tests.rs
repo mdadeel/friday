@@ -289,3 +289,41 @@ async fn test_cancellation_endpoint() {
     .unwrap();
     assert_eq!(val["status"], "no_active_generation");
 }
+
+#[tokio::test]
+async fn test_tools_and_capabilities_endpoint() {
+    let storage = Storage::open_in_memory().unwrap();
+    let event_bus = EventBus::new(16);
+    let models = ProviderRegistry::new();
+    let state = AppState::new(storage.clone(), event_bus, models, None);
+    let app = create_router(state);
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/tools")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+
+    let count = val["count"].as_u64().unwrap();
+    assert!(count >= 5);
+    let tools = val["tools"].as_array().unwrap();
+    assert!(tools.iter().any(|t| t["name"] == "fs.read_file"));
+    assert!(tools.iter().any(|t| t["name"] == "fs.write_file"));
+    assert!(tools.iter().any(|t| t["name"] == "fs.list_dir"));
+    assert!(tools.iter().any(|t| t["name"] == "system.execute_command"));
+    assert!(tools.iter().any(|t| t["name"] == "datetime.now"));
+}

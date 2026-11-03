@@ -62,6 +62,22 @@
     - `tests/api_integration_tests.rs::test_end_to_end_conversation_streaming_and_persistence`: PASSED (Full pipeline: session creation -> user message submission -> spawned streaming worker -> `message.delta` streaming tokens over EventBus -> `message.final` event -> assistant turn persisted in SQLite with thinking -> task updated to `completed`)
     - `tests/api_integration_tests.rs::test_session_and_turn_crud_endpoints`: PASSED (Full CRUD: create session, get session, patch session title, append turn, get turn, patch turn content, delete turn, delete session with child turn cascade cleanup)
     - `tests/api_integration_tests.rs::test_cancellation_endpoint`: PASSED (`POST /v1/sessions/{id}/cancel` invokes active CancellationToken and returns cancellation status)
+    - `tests/api_integration_tests.rs::test_tools_and_capabilities_endpoint`: PASSED (`GET /v1/tools` returns all 5 registered tools with schemas and autonomy classes)
+  - `edith-tools`:
+    - `policy::tests::test_blocked_tool_denied`: PASSED (Blocked tools are denied outright)
+    - `policy::tests::test_dangerous_path_denied`: PASSED (Access to `/etc/shadow` and sensitive paths is strictly denied)
+    - `policy::tests::test_shell_command_denied`: PASSED (Raw shell execution via `bash -c` is forbidden)
+    - `policy::tests::test_allowlisted_command_allowed`: PASSED (Allowlisted development tools like `git` are permitted)
+    - `registry::tests::test_registry_with_builtins`: PASSED (Builtin tools registration and schema export)
+    - `registry::tests::test_datetime_tool_execution`: PASSED (Execution of `datetime.now`)
+    - `registry::tests::test_filesystem_lifecycle`: PASSED (Write, read, and list directory within allowed workspace)
+    - `registry::tests::test_command_execution`: PASSED (Execution of allowlisted command `echo`)
+  - `edith-mcp`:
+    - `tests::test_jsonrpc_request_serialization`: PASSED (JSON-RPC 2.0 request formatting)
+    - `tests::test_mcp_tool_definition_deserialization`: PASSED (MCP tool definition and schema parsing)
+    - `tests::test_tool_call_result_parsing`: PASSED (MCP content block and error parsing)
+  - `edith-agent`:
+    - `executor::tests::test_execution_engine_real_tool_dispatch`: PASSED (ExecutionEngine executes plan with native datetime and echo commands)
 
 ### 3. Live Daemon Verification (`edith-daemon`)
 - Command: `./target/debug/edith-daemon`
@@ -83,3 +99,6 @@
   - **Deterministic Tier 0 Time & Date (Phase 5)**:
     - User message: `"what time is it"`
     - Result: `"The current local time is 12:57:50 (+06:00), and UTC time is 06:57:50 UTC."` returned instantaneously.
+  - **Tools and Capabilities Inspection (Phase 6)**:
+    - Endpoints: `GET /v1/tools` and `GET /v1/capabilities` with Bearer auth token.
+    - Result: Successfully enumerated 5 registered native tools (`datetime.now`, `fs.list_dir`, `fs.read_file`, `fs.write_file`, `system.execute_command`) complete with input JSON schemas, side effects, and policy autonomy classifications.

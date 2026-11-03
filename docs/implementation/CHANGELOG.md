@@ -1,5 +1,38 @@
 # EDITH 2.0 — Engineering Changelog
 
+## [0.6.0] - 2026-11-03
+
+### Phase 6: Tool & MCP Infrastructure
+- Created crate [`crates/edith-tools`](crates/edith-tools):
+  - Defined unified [`Tool`](crates/edith-tools/src/tool.rs) trait supporting async execution, JSON Schema parameters, declared `SideEffects` (None, Read, Write, Network, Process, System), and `AutonomyClass`.
+  - Implemented pure [`PolicyEngine`](crates/edith-tools/src/policy.rs):
+    - Path containment validation preventing directory traversal escapes (`..`) and guarding sensitive system paths (`/etc`, `/boot`, `/sys`, `/proc`, `~/.ssh`, `~/.gnupg`).
+    - Command template enforcement disallowing raw shell string interpolation (`bash -c`, `sh -c`) and validating allowlisted developer binaries (`git`, `cargo`, `npm`, `node`, `python3`, `echo`, `cat`, `ls`).
+    - Evaluates autonomy decisions into `Allow`, `ConfirmRequired`, or `Deny`.
+  - Implemented core native tools in `native/`:
+    - `fs.read_file`: Scoped UTF-8 file reading with 2MB memory protection.
+    - `fs.write_file`: Scoped file writing with automatic parent directory creation.
+    - `fs.list_dir`: Scoped directory enumeration with sorted entry metadata.
+    - `system.execute_command`: Direct child process execution with stdout/stderr stream truncation at 1MB and timeouts.
+    - `datetime.now`: Current ISO 8601 local and UTC timestamps and timezone offset.
+  - Implemented [`ToolRegistry`](crates/edith-tools/src/registry.rs):
+    - Thread-safe tool management, discovery, and schema export (`export_schemas()`) compatible with OpenAI, Gemini, and Qwen function calling.
+    - Policy-gated tool invocation.
+- Created crate [`crates/edith-mcp`](crates/edith-mcp):
+  - Implemented Model Context Protocol (MCP) JSON-RPC 2.0 types and protocol models.
+  - Implemented [`StdioMcpClient`](crates/edith-mcp/src/client.rs) managing child process lifecycle, initialization handshake (`initialize` / `notifications/initialized`), `tools/list` discovery, and `tools/call` invocation.
+  - Implemented [`McpToolAdapter`](crates/edith-mcp/src/adapter.rs) dynamically translating MCP tools into EDITH `Tool` trait instances under the `mcp:<server_id>/<tool_name>` namespace.
+- Integrated Tools into Agent Runtime and API:
+  - Wired `ToolRegistry` and `PolicyEngine` into [`ExecutionEngine`](crates/edith-agent/src/executor.rs) so multi-step plans execute real native and MCP tools.
+  - Added dynamic tool capability injection into [`ContextBuilder`](crates/edith-agent/src/context.rs).
+  - Added `GET /v1/tools` and `GET /v1/capabilities` endpoints to `edith-api`.
+- Verification & Testing:
+  - 11 new unit and integration tests added across `edith-tools`, `edith-mcp`, `edith-agent`, and `edith-api`.
+  - Full workspace test suite passes with **50 tests passing** across all 9 crates.
+  - Live daemon tested with curl: `GET /v1/tools` successfully enumerates registered tools with schemas and autonomy policies.
+
+---
+
 ## [0.5.0] - 2026-11-03
 
 ### Phase 5: Intelligent Model Routing

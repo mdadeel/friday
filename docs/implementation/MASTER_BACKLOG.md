@@ -63,8 +63,20 @@
 
 | Task ID | Component | Description | Status | Verification Criteria |
 |---------|-----------|-------------|--------|-----------------------|
-| **TSK-601** | `edith-tools` | Unified `Tool` trait, parameters schema validation, permissions model, execution result types | Planned | Trait and schema unit tests pass |
-| **TSK-602** | `edith-tools` | Core native built-in tools: `fs.read_file`, `fs.write_file`, `fs.list_dir`, `system.execute_command`, `datetime.now` | Planned | Sandboxed execution & path containment tests pass |
-| **TSK-603** | `edith-tools` | Tool registry: thread-safe registration, discovery, schema export for LLM function calling | Planned | Registry resolution & schema export tests pass |
-| **TSK-604** | `edith-mcp` | Model Context Protocol (MCP) client connecting via stdio JSON-RPC | Planned | MCP client connects, lists tools, calls tools |
-| **TSK-605** | `edith-agent` | Wire Tool Registry into `ExecutionEngine`, replacing step mock dispatch with real tool invocation | Planned | Live plan executes real filesystem/command tool steps |
+| **TSK-601** | `edith-tools` | Unified `Tool` trait, parameters schema validation, permissions model, execution result types | **Completed** | Trait and schema unit tests pass |
+| **TSK-602** | `edith-tools` | Core native built-in tools: `fs.read_file`, `fs.write_file`, `fs.list_dir`, `system.execute_command`, `datetime.now` | **Completed** | Sandboxed execution & path containment tests pass |
+| **TSK-603** | `edith-tools` | Tool registry: thread-safe registration, discovery, schema export for LLM function calling | **Completed** | Registry resolution & schema export tests pass |
+| **TSK-604** | `edith-mcp` | Model Context Protocol (MCP) client connecting via stdio JSON-RPC | **Completed** | Protocol serialization and client lifecycle tests pass |
+| **TSK-605** | `edith-agent` | Wire Tool Registry into `ExecutionEngine`, replacing step mock dispatch with real tool invocation | **Completed** | Real tool dispatch executed and verified in test suite |
+
+---
+
+## Epic 7: Persistent Memory (Phase 7)
+
+| Task ID | Component | Description | Status | Verification Criteria |
+|---------|-----------|-------------|--------|-----------------------|
+| **TSK-701** | `edith-storage` | Migration `0003_memory_tables.sql` for semantic, episodic, procedural, and working memory | Planned | Database migration executes cleanly |
+| **TSK-702** | `edith-memory` | Provenance classification engine (explicit, inferred, temporary, assumption) | Planned | Unit tests verify provenance rejection/acceptance rules |
+| **TSK-703** | `edith-memory` | Memory facade service coordinating working scratchpad, episodic recalls, and semantic facts | Planned | Memory CRUD & search unit tests pass |
+| **TSK-704** | `edith-agent` | ContextBuilder integration: inject accepted semantic facts & episodic memories within token budgets | Planned | ContextBuilder tests pass with memory injection |
+| **TSK-705** | `edith-api` | Memory management endpoints (`GET /v1/memory/items`, `PATCH /v1/memory/items/{id}`, `DELETE /v1/memory/items/{id}`) | Planned | API integration tests pass |

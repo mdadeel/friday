@@ -9,6 +9,8 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
+use edith_tools::{PolicyEngine, ToolRegistry};
+
 #[async_trait]
 pub trait StepHandler: Send + Sync {
     async fn execute(&self, step: &PlanStep) -> Result<Value, String>;
@@ -17,6 +19,8 @@ pub trait StepHandler: Send + Sync {
 pub struct ExecutionEngine {
     event_bus: EventBus,
     handlers: Arc<RwLock<HashMap<String, Arc<dyn StepHandler>>>>,
+    tool_registry: ToolRegistry,
+    policy_engine: PolicyEngine,
 }
 
 impl ExecutionEngine {
@@ -24,7 +28,30 @@ impl ExecutionEngine {
         Self {
             event_bus,
             handlers: Arc::new(RwLock::new(HashMap::new())),
+            tool_registry: ToolRegistry::with_builtins(),
+            policy_engine: PolicyEngine::default(),
         }
+    }
+
+    pub fn with_tools(
+        event_bus: EventBus,
+        tool_registry: ToolRegistry,
+        policy_engine: PolicyEngine,
+    ) -> Self {
+        Self {
+            event_bus,
+            handlers: Arc::new(RwLock::new(HashMap::new())),
+            tool_registry,
+            policy_engine,
+        }
+    }
+
+    pub fn tool_registry(&self) -> &ToolRegistry {
+        &self.tool_registry
+    }
+
+    pub fn policy_engine(&self) -> &PolicyEngine {
+        &self.policy_engine
     }
 
     pub async fn register_handler(&self, capability: impl Into<String>, handler: Arc<dyn StepHandler>) {
@@ -88,12 +115,23 @@ impl ExecutionEngine {
                 let exec_result = match handler {
                     Some(h) => h.execute(step).await,
                     None => {
-                        // Default mock/fallback execution if no specific tool handler registered
-                        Ok(serde_json::json!({
-                            "status": "simulated",
-                            "capability": step.capability,
-                            "message": format!("Step '{}' executed successfully", step.title)
-                        }))
+                        if self.tool_registry.contains(&step.capability) {
+                            match self
+                                .tool_registry
+                                .invoke(&step.capability, step.params.clone(), &self.policy_engine)
+                                .await
+                            {
+                                Ok(output) => Ok(output),
+                                Err(e) => Err(e.to_string()),
+                            }
+                        } else {
+                            // Default mock/fallback execution if no specific tool handler registered
+                            Ok(serde_json::json!({
+                                "status": "simulated",
+                                "capability": step.capability,
+                                "message": format!("Step '{}' executed successfully", step.title)
+                            }))
+                        }
                     }
                 };
 
@@ -229,5 +267,37 @@ mod tests {
         assert!(!success);
         assert_eq!(plan.steps[0].status, StepStatus::Skipped);
         assert_eq!(plan.steps[1].status, StepStatus::Skipped);
+    }
+
+    #[tokio::test]
+    async fn test_execution_engine_real_tool_dispatch() {
+        let event_bus = EventBus::new(32);
+        let engine = ExecutionEngine::new(event_bus);
+
+        // Plan with native datetime.now and system.execute_command
+        let step1 = PlanStep::new("Get Time", "datetime.now", serde_json::json!({}));
+        let step2 = PlanStep::new(
+            "Echo Check",
+            "system.execute_command",
+            serde_json::json!({
+                "program": "echo",
+                "args": ["EDITH_AGENT_TOOLS_ACTIVE"]
+            }),
+        );
+
+        let mut plan = Plan::new("task-tools", "Tools Execution Test", vec![step1, step2]);
+        let token = CancellationToken::new();
+
+        let success = engine.execute_plan(&mut plan, token).await.unwrap();
+        assert!(success);
+        assert!(plan.is_complete());
+
+        // Verify outputs from real tools
+        let out1 = plan.steps[0].output.as_ref().unwrap();
+        assert!(out1.get("utc").is_some());
+
+        let out2 = plan.steps[1].output.as_ref().unwrap();
+        assert_eq!(out2.get("success").unwrap(), true);
+        assert!(out2.get("stdout").unwrap().as_str().unwrap().contains("EDITH_AGENT_TOOLS_ACTIVE"));
     }
 }

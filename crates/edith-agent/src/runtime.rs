@@ -53,6 +53,19 @@ impl AgentRuntime {
         self.router.clone()
     }
 
+    pub fn tool_registry(&self) -> &edith_tools::ToolRegistry {
+        self.executor.tool_registry()
+    }
+
+    pub fn format_tools_prompt(&self) -> String {
+        let descriptors = self.executor.tool_registry().list_descriptors();
+        let mut prompt = String::new();
+        for desc in descriptors {
+            prompt.push_str(&format!("- `{}`: {}\n", desc.name, desc.description));
+        }
+        prompt
+    }
+
     /// Orchestrates an incoming user objective from routing/planning through execution and verification.
     pub async fn execute_objective(
         &self,
@@ -75,9 +88,10 @@ impl AgentRuntime {
             .await?;
         self.publish_task_event(task_id, "task.state_changed", "planning", session_id);
 
-        // 2. Fetch turns & build context
+        // 2. Fetch turns & build context with available tool capabilities
         let turns = self.storage.list_turns(session_id).await.unwrap_or_default();
-        let context_builder = ContextBuilder::new();
+        let tools_prompt = self.format_tools_prompt();
+        let context_builder = ContextBuilder::new().with_tools_prompt(tools_prompt);
         let messages = context_builder.build(&turns);
 
         // 3. Routing decision (Tier 0 heuristic or model selection)
