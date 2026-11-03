@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { Shell } from './components/Shell';
+import { PromptKitShell } from './components/PromptKitShell';
 import { useRoute } from './app/router';
 import { useObservable, useServices } from './app/services';
-import { ConversationScreen } from './screens/Conversation';
+import { PromptKitConversation } from './screens/PromptKitConversation';
 import { OverlayScreen } from './screens/Overlay';
 import { ActivityScreen } from './screens/Activity';
 import { MemoryScreen } from './screens/Memory';
@@ -47,7 +47,7 @@ export default function App() {
       break;
     case 'chat':
     default:
-      screen = <ConversationScreen />;
+      screen = <PromptKitConversation />;
   }
-  return <Shell route={route.name}>{screen}</Shell>;
+  return <PromptKitShell route={route.name}>{screen}</PromptKitShell>;
 }

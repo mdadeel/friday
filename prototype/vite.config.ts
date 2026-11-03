@@ -1,10 +1,15 @@
+import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// The prototype has no backend. Dev server binds to 0.0.0.0 so the sandbox
-// preview can reach it; allowedHosts is open because preview hosts are dynamic.
+// The prototype dev server binds to 0.0.0.0.
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,
