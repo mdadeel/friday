@@ -24,7 +24,7 @@ flowchart LR
   P6 --> P7[7 Orchestration]
   P9a --> P7
   P7 --> P8[8 Tools + MCP + skills]
-  P7 --> P10[10 Context]
+  P7 --> P10[10a Context]
   P8 --> P12[12 Search + research]
   P6 --> P12
   P9a --> P9b[9b Memory retrieval quality]
@@ -172,6 +172,8 @@ flowchart LR
 
 ## Phase 9 — Persistent memory and personal understanding
 
+Sub-phases: **9a** memory store, **9b** retrieval quality (gate G2). Both are reported under Phase 9.
+
 Split into two parts.
 
 ### 9a — Store and explorer (before voice)
@@ -188,7 +190,7 @@ Split into two parts.
 - **Testing:** labelled retrieval set; contradiction fixtures; evaluation transcripts.
 - **Technical risks:** extraction noise; embedding model drift; vector index crash risk (G2).
 
-## Phase 10 — Model specialisation and learning (dataset and evaluation first)
+## Phase 10b — Model specialisation and learning (dataset and evaluation first)
 
 - **Objectives:** three stages from the specification. Stage 1 (prompting, routing, memory) is already part of earlier phases. This phase delivers **Stage 2 preparation** (dataset curation and evaluation) and **Stage 3 instrumentation** (continuous evaluation from traces). Fine-tuning training runs are not in this phase.
 - **Components:** dataset export with review, evaluation harness, trace analytics, model version registry.
@@ -197,7 +199,7 @@ Split into two parts.
 - **Testing:** dataset linting; reproducibility test.
 - **Technical risks:** privacy leakage in datasets; training on noisy traces; hardware cost of LoRA/QLoRA.
 
-Note: the context-acquisition work (C30) is also scheduled here as "Phase 10 — context" in [CAPABILITY_MATRIX](EDITH_CAPABILITY_MATRIX.md). It depends on Phase 7 and is independent of the specialisation work. Treat it as Phase 10a (context) and Phase 10b (specialisation prep).
+Note: the context-acquisition work (C30) is listed in [CAPABILITY_MATRIX](EDITH_CAPABILITY_MATRIX.md) under Phase 10a. It depends on Phase 7 and is independent of the specialisation work. Phase 10a (context) and Phase 10b (specialisation prep) are separate phases.
 
 ## Phase 10a — Context acquisition (environment awareness)
 

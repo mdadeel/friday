@@ -374,7 +374,7 @@ function SystemPanel() {
       <dl className="kv small">
         <dt>Prototype version</dt><dd>0.1.0 (web, simulated)</dd>
         <dt>Daemon</dt><dd>Not running. The real daemon is planned as <code>edith-daemon</code>.</dd>
-        <dt>Local API</dt><dd>Planned: HTTP/JSON over a local socket, <code>/v1</code>. Socket path not fixed (see open decision).</dd>
+        <dt>Local API</dt><dd>Planned: HTTP/JSON over a Unix socket at <code>$XDG_RUNTIME_DIR/edith/api.sock</code> (mode 0600), routes under <code>/v1</code>. Not running here.</dd>
         <dt>Overlay mode in use</dt><dd>Plain window (prototype web page; no desktop overlay)</dd>
         <dt>Storage used</dt><dd>0 MB (nothing is stored outside this browser tab)</dd>
       </dl>

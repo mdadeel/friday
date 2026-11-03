@@ -35,7 +35,7 @@ Prototype legend: **Interactive (simulated)** — UI behaviour works, backing da
 | C27 | Settings application, 14 sections | UI_UX §4 | Interactive (all sections render; values stored in memory) | 5–16 | Config store |
 | C28 | Theme and appearance controls | FRONTEND §3, UI_UX §4.13 | Interactive | 14 | None |
 | C29 | Logs and diagnostics | DETAILED §3.23 | Interactive (seeded log, filter) | 5 | Observability |
-| C30 | Context sources (git, project, focus) | DETAILED §3.18 | Display (toggles only) | 10 | Context acquisition |
+| C30 | Context sources (git, project, focus) | DETAILED §3.18 | Display (toggles only) | 10a | Context acquisition |
 | C31 | Wake word | VOICE §10 | Not in prototype | Later | Design review |
 | C32 | Fine-tuning pipeline | Vision §6 | Not in prototype | Later | Dataset review |
 | C33 | Browser automation | SEARCH §7 | Not in prototype | 12 | Browser engine |
