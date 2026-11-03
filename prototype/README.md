@@ -43,3 +43,8 @@ npm run build      # typecheck + production build to dist/
 - Timings (latency, first-token, search p50/p95) are fixed illustrative numbers, not measurements.
 - Model names marked "candidate" depend on gate G1 in the roadmap.
 - The Tier 0 calculator is a restricted parser for `+ - * / % ^`, parentheses and decimals. It does not call `eval`.
+
+
+## Redesign status
+
+The UI was rebuilt in the redesign pass. The screens, components and token mapping are listed in `CONFORMANCE.md`, which records what is done, partial or not done against the UI spec and design system. Run the checks with `npm run typecheck`, `npm test`, and `npm run build`. Component tests use Vitest and Testing Library (`npm run test:ui`).

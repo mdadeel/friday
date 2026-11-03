@@ -1,6 +1,6 @@
 import { Store } from '../store';
 import type { CapabilityService, CapabilityState, DiagnosticsService } from '../contracts';
-import type { CapabilityKind, McpServer, Skill } from '../../types/contracts';
+import type { CapabilityKind, McpServer } from '../../types/contracts';
 import { seedMcpServers, seedSkills } from '../../data/seed';
 
 export function createCapabilityService(diag: DiagnosticsService): CapabilityService {
@@ -18,11 +18,8 @@ export function createCapabilityService(diag: DiagnosticsService): CapabilitySer
       timers.push(
         setTimeout(() => {
           // web-docs needs an auth secret that is not configured, so it stays unavailable.
-          if (id === 'web-docs') {
-            updateServer(id, (s) => ({ ...s, state: 'unavailable', reason: 'Authentication not configured (simulated).' }));
-          } else {
-            updateServer(id, (s) => ({ ...s, state: 'ready' }));
-          }
+          if (id === 'web-docs') updateServer(id, (s) => ({ ...s, state: 'unavailable', reason: 'Authentication not configured (simulated).' }));
+          else updateServer(id, (s) => ({ ...s, state: 'ready' }));
         }, 1100),
       );
     }
@@ -39,17 +36,17 @@ export function createCapabilityService(diag: DiagnosticsService): CapabilitySer
   };
 
   const setSkillEnabled = (id: string, enabled: boolean): void => {
-    store.set((s) => ({ ...s, skills: s.skills.map((k: Skill) => (k.id === id ? { ...k, enabled } : k)) }));
+    store.set((s) => ({ ...s, skills: s.skills.map((k) => (k.id === id ? { ...k, enabled } : k)) }));
   };
 
   const approveSkillChange = (id: string): void => {
-    store.set((s) => ({ ...s, skills: s.skills.map((k: Skill) => (k.id === id ? { ...k, hashStatus: 'approved' as const } : k)) }));
+    store.set((s) => ({ ...s, skills: s.skills.map((k) => (k.id === id ? { ...k, hashStatus: 'approved' as const } : k)) }));
     diag.log('skills', 'info', `${id} new content hash approved (simulated)`);
   };
 
   const kindOf = (capability: string): CapabilityKind => {
     if (capability.startsWith('mcp:')) return 'mcp_tool';
-    if (capability.startsWith('model:')) return 'external_service';
+    if (capability.startsWith('model:') || capability.startsWith('search:')) return 'external_service';
     if (capability.startsWith('skill:')) return 'instruction';
     return 'native_tool';
   };

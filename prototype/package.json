@@ -9,18 +9,23 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/logic.test.ts && npm run test:services",
-    "test:services": "esbuild tests/services.test.ts --bundle --platform=node --format=esm --log-level=warning --outfile=build-tests/services.test.mjs && node --test build-tests/services.test.mjs"
+    "test": "node --experimental-strip-types --test tests/logic.test.ts && npm run test:services && npm run test:ui",
+    "test:services": "esbuild tests/services.test.ts --bundle --platform=node --format=esm --log-level=warning --outfile=build-tests/services.test.mjs && node --test build-tests/services.test.mjs",
+    "test:ui": "vitest run"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^2.1.9"
   }
 }

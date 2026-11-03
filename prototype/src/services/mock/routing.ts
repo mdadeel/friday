@@ -1,7 +1,7 @@
 import { Store } from '../store';
 import type { DiagnosticsService, RoutingService } from '../contracts';
 import type { ProviderInfo, RouteInfo, RoutingState, Tier } from '../../types/contracts';
-import { seedCategories, seedProviders, seedRecentRoutes, seedRoutingEvents, seedTiers } from '../../data/seed';
+import { seedCategories, seedModels, seedProviders, seedRecentRoutes, seedRoutingEvents, seedTiers } from '../../data/seed';
 import { classifyIntent, buildRoute } from './logic';
 import { nextId, nowIso } from './ids';
 
@@ -16,8 +16,9 @@ const PROBE_RESULT: Record<string, ProviderInfo['health']> = {
 };
 
 export function createRoutingService(diag: DiagnosticsService): RoutingService {
-  const initial: RoutingState = {
+  const store = new Store<RoutingState>({
     providers: seedProviders,
+    models: seedModels,
     tiers: seedTiers,
     categories: seedCategories,
     recent: seedRecentRoutes,
@@ -27,8 +28,7 @@ export function createRoutingService(diag: DiagnosticsService): RoutingService {
     medianFirstTokenMs: 740,
     fallbacks24h: 6,
     simulated: true,
-  };
-  const store = new Store<RoutingState>(initial);
+  });
 
   const record = (route: RouteInfo): void => {
     store.set((s) => ({
@@ -38,30 +38,49 @@ export function createRoutingService(diag: DiagnosticsService): RoutingService {
       fallbacks24h: route.outcome === 'fallback' ? s.fallbacks24h + 1 : s.fallbacks24h,
       events:
         route.outcome === 'fallback'
-          ? [{ id: nextId('ev'), at: nowIso(), severity: 'warn' as const, text: `Fallback used for ${route.category ?? 'request'} (simulated).` }, ...s.events].slice(0, 20)
+          ? [{ id: nextId('ev'), at: nowIso(), severity: 'warn' as const, kind: 'fallback' as const, text: `Fallback used for ${route.category} (simulated).` }, ...s.events].slice(0, 30)
           : s.events,
     }));
   };
+
+  const addEvent = (s: RoutingState, text: string, severity: 'info' | 'warn' | 'error', kind: RoutingState['events'][number]['kind']): RoutingState['events'] =>
+    [{ id: nextId('ev'), at: nowIso(), severity, kind, text }, ...s.events].slice(0, 30);
 
   const setTier = (tier: Tier, patch: { provider?: string; model?: string }): void => {
     store.set((s) => ({
       ...s,
       tiers: s.tiers.map((t) => (t.tier === tier ? { ...t, provider: patch.provider ?? t.provider, model: patch.model ?? t.model } : t)),
-      events: [{ id: nextId('ev'), at: nowIso(), severity: 'info' as const, text: `${tier} route changed in prototype (not persisted).` }, ...s.events].slice(0, 20),
+      events: addEvent(s, `${tier} route changed in the prototype (not persisted).`, 'info', 'route_change'),
     }));
     diag.log('router', 'info', `${tier} route changed (simulated)`);
+  };
+
+  const setFallbacks = (tier: Tier, fallbacks: string[]): void => {
+    store.set((s) => ({
+      ...s,
+      tiers: s.tiers.map((t) => (t.tier === tier ? { ...t, fallbacks } : t)),
+      events: addEvent(s, `${tier} fallback order changed (not persisted).`, 'info', 'route_change'),
+    }));
+  };
+
+  const setModelLoaded = (id: string, loaded: boolean): void => {
+    store.set((s) => ({
+      ...s,
+      models: s.models.map((m) => (m.id === id ? { ...m, loaded } : m)),
+      events: addEvent(s, `${s.models.find((m) => m.id === id)?.name ?? id} ${loaded ? 'loaded' : 'unloaded'} (simulated, nothing started).`, 'info', 'route_change'),
+    }));
   };
 
   const probe = (providerId: string): void => {
     store.set((s) => ({ ...s, providers: s.providers.map((p) => (p.id === providerId ? { ...p, health: 'probing' as const } : p)) }));
     setTimeout(() => {
+      const result = PROBE_RESULT[providerId] ?? 'down';
       store.set((s) => ({
         ...s,
-        providers: s.providers.map((p) =>
-          p.id === providerId ? { ...p, health: PROBE_RESULT[providerId] ?? 'down', lastProbe: nowIso() } : p,
-        ),
+        providers: s.providers.map((p) => (p.id === providerId ? { ...p, health: result, lastProbe: nowIso() } : p)),
+        events: addEvent(s, `Probe ${providerId}: ${result} (simulated, no network call).`, result === 'up' ? 'info' : 'warn', 'probe'),
       }));
-      diag.log('models', 'info', `probe ${providerId}: ${PROBE_RESULT[providerId] ?? 'down'} (simulated)`);
+      diag.log('models', 'info', `probe ${providerId}: ${result} (simulated)`);
     }, 900);
   };
 
@@ -70,5 +89,5 @@ export function createRoutingService(diag: DiagnosticsService): RoutingService {
     return buildRoute('preview', nowIso(), classifyIntent(text), 0);
   };
 
-  return { get: store.get, subscribe: store.subscribe, record, setTier, probe, testRoute };
+  return { get: store.get, subscribe: store.subscribe, record, setTier, setFallbacks, setModelLoaded, probe, testRoute };
 }

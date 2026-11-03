@@ -226,6 +226,11 @@ export function routeRuleFor(intent: TaskIntent): RouteRule {
   }
 }
 
+/** Local providers keep data on this machine; cloud providers send it out. */
+export function localityOf(provider: string): 'Local' | 'Cloud' {
+  return provider === 'cloud_llm' || provider === 'gemini_live' ? 'Cloud' : 'Local';
+}
+
 export function buildRoute(id: string, at: string, intent: TaskIntent, latencyMs: number): RouteInfo {
   const rule = routeRuleFor(intent);
   return {
@@ -235,6 +240,7 @@ export function buildRoute(id: string, at: string, intent: TaskIntent, latencyMs
     provider: rule.provider,
     model: rule.model,
     dataClass: 'Personal',
+    locality: localityOf(rule.provider),
     reason: rule.reason,
     fallbacks: rule.fallbacks,
     latencyMs,
@@ -247,9 +253,11 @@ export function buildRoute(id: string, at: string, intent: TaskIntent, latencyMs
 export interface PlanSeed {
   label: string;
   capability: string;
+  kind: 'tool' | 'model';
   deps: number[]; // indexes into the same list
   tier: Tier;
   needsApproval?: boolean;
+  failOnce?: boolean;
   ticks: number;
 }
 
@@ -267,14 +275,14 @@ export function planFor(intent: TaskIntent): PlanTemplate {
         verification: 'evidence',
         criteria: ['Every claim maps to a retrieved source span', 'Alternatives compared with stated criteria'],
         subtasks: [
-          { label: 'Retrieve project memory', capability: 'native:memory.search', deps: [], tier: 'T0', ticks: 2 },
-          { label: 'Search: official SDK documentation', capability: 'native:search.web', deps: [], tier: 'T4', ticks: 3 },
-          { label: 'Search: alternatives and benchmarks', capability: 'native:search.web', deps: [], tier: 'T4', ticks: 3 },
-          { label: 'Read top sources', capability: 'native:fetch.url', deps: [1, 2], tier: 'T4', ticks: 3 },
-          { label: 'Compare alternatives', capability: 'model:reasoning', deps: [0, 3], tier: 'T3', ticks: 4 },
-          { label: 'Draft recommendation', capability: 'model:reasoning', deps: [4], tier: 'T3', ticks: 3 },
-          { label: 'Verify claims against evidence', capability: 'model:verifier', deps: [5], tier: 'T2', ticks: 2 },
-          { label: 'Propose memory updates', capability: 'native:memory.propose', deps: [6], tier: 'T1', ticks: 1 },
+          { label: 'Retrieve project memory', kind: 'tool', capability: 'native:memory.search', deps: [], tier: 'T0', ticks: 2 },
+          { label: 'Search: official SDK documentation', kind: 'tool', capability: 'native:search.web', deps: [], tier: 'T4', ticks: 3 },
+          { label: 'Search: alternatives and benchmarks', kind: 'tool', capability: 'native:search.web', deps: [], tier: 'T4', ticks: 3, failOnce: true },
+          { label: 'Read top sources', kind: 'tool', capability: 'native:fetch.url', deps: [1, 2], tier: 'T4', ticks: 3 },
+          { label: 'Compare alternatives', kind: 'model', capability: 'model:reasoning', deps: [0, 3], tier: 'T3', ticks: 4 },
+          { label: 'Draft recommendation', kind: 'model', capability: 'model:reasoning', deps: [4], tier: 'T3', ticks: 3 },
+          { label: 'Verify claims against evidence', kind: 'model', capability: 'model:verifier', deps: [5], tier: 'T2', ticks: 2 },
+          { label: 'Propose memory updates', kind: 'tool', capability: 'native:memory.propose', deps: [6], tier: 'T1', ticks: 1 },
         ],
       };
     case 'code':
@@ -282,12 +290,12 @@ export function planFor(intent: TaskIntent): PlanTemplate {
         verification: 'mechanical',
         criteria: ['Test suite passes after the patch', 'Changed files stay within the approved limit'],
         subtasks: [
-          { label: 'Locate authentication code', capability: 'native:fs.read', deps: [], tier: 'T2', ticks: 2 },
-          { label: 'Reproduce failing test', capability: 'native:process.run_template', deps: [0], tier: 'T0', ticks: 2 },
-          { label: 'Propose patch', capability: 'model:reasoning', deps: [1], tier: 'T3', ticks: 4 },
-          { label: 'Apply patch to project files', capability: 'native:fs.write', deps: [2], tier: 'T0', ticks: 2, needsApproval: true },
-          { label: 'Run project tests', capability: 'native:process.run_template', deps: [3], tier: 'T0', ticks: 3 },
-          { label: 'Verify test result', capability: 'model:verifier', deps: [4], tier: 'T2', ticks: 1 },
+          { label: 'Locate authentication code', kind: 'tool', capability: 'native:fs.read', deps: [], tier: 'T2', ticks: 2 },
+          { label: 'Reproduce failing test', kind: 'tool', capability: 'native:process.run_template', deps: [0], tier: 'T0', ticks: 2 },
+          { label: 'Propose patch', kind: 'model', capability: 'model:reasoning', deps: [1], tier: 'T3', ticks: 4 },
+          { label: 'Apply patch to project files', kind: 'tool', capability: 'native:fs.write', deps: [2], tier: 'T0', ticks: 2, needsApproval: true },
+          { label: 'Run project tests', kind: 'tool', capability: 'native:process.run_template', deps: [3], tier: 'T0', ticks: 3 },
+          { label: 'Verify test result', kind: 'model', capability: 'model:verifier', deps: [4], tier: 'T2', ticks: 1 },
         ],
       };
     case 'continue':
@@ -295,17 +303,17 @@ export function planFor(intent: TaskIntent): PlanTemplate {
         verification: 'evidence',
         criteria: ['Stopping point identified from stored evidence', 'Discrepancies reported'],
         subtasks: [
-          { label: 'Retrieve episodic memory', capability: 'native:memory.search', deps: [], tier: 'T0', ticks: 2 },
-          { label: 'Check project state (git status)', capability: 'native:git.status', deps: [], tier: 'T0', ticks: 2 },
-          { label: 'Identify stopping point', capability: 'model:reasoning', deps: [0, 1], tier: 'T2', ticks: 2 },
-          { label: 'Resume plan', capability: 'model:reasoning', deps: [2], tier: 'T2', ticks: 2 },
+          { label: 'Retrieve episodic memory', kind: 'tool', capability: 'native:memory.search', deps: [], tier: 'T0', ticks: 2 },
+          { label: 'Check project state (git status)', kind: 'tool', capability: 'native:git.status', deps: [], tier: 'T0', ticks: 2 },
+          { label: 'Identify stopping point', kind: 'model', capability: 'model:reasoning', deps: [0, 1], tier: 'T2', ticks: 2 },
+          { label: 'Resume plan', kind: 'model', capability: 'model:reasoning', deps: [2], tier: 'T2', ticks: 2 },
         ],
       };
     default:
       return {
         verification: 'none_declared',
         criteria: [],
-        subtasks: [{ label: 'Answer', capability: 'model:chat', deps: [], tier: 'T2', ticks: 2 }],
+        subtasks: [{ label: 'Answer', kind: 'model', capability: 'model:chat', deps: [], tier: 'T2', ticks: 2 }],
       };
   }
 }

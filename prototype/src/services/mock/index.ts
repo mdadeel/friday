@@ -9,13 +9,15 @@ import { createPolicyService } from './policy';
 import { createSettingsService } from './settings';
 import { createSearchService } from './search';
 import { createDiagnosticsService } from './diagnostics';
+import { createNotificationService } from './notifications';
 
 /** Builds every simulated service. The UI only sees the interfaces in ../contracts. */
 export function createMockServices(): Services {
   const diagnostics = createDiagnosticsService();
+  const notifications = createNotificationService();
   const routing = createRoutingService(diagnostics);
   const memory = createMemoryService(diagnostics);
-  const tasks = createTaskService(diagnostics);
+  const tasks = createTaskService({ diag: diagnostics, notify: notifications });
   let conversation: ReturnType<typeof createConversationService> | null = null;
   const voice = createVoiceService({
     diag: diagnostics,
@@ -41,5 +43,6 @@ export function createMockServices(): Services {
     settings: createSettingsService(diagnostics),
     search: createSearchService(),
     diagnostics,
+    notifications,
   };
 }

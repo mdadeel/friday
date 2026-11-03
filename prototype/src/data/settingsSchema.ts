@@ -1,125 +1,145 @@
-// Settings schema for the Settings screen. Field defaults follow the spec where it gives a value.
-// Prototype: values are held in memory only. Nothing is persisted and no daemon reads them.
+// Settings schema. Field defaults follow the spec where it gives a value.
+// Prototype: values are held in memory for this browser session only. No daemon reads them.
+// Each field declares how it would apply in the real system: "now" (takes effect immediately),
+// "session" (kept for this session only), or "restart" (needs a daemon restart).
 import type { SettingsValues, SettingValue } from '../services/contracts';
 
+export type Apply = 'now' | 'session' | 'restart';
+
+interface FieldBase {
+  key: string;
+  label: string;
+  help?: string;
+  apply: Apply;
+}
+
 export type FieldDef =
-  | { key: string; label: string; help?: string; kind: 'toggle'; def: boolean }
-  | { key: string; label: string; help?: string; kind: 'select'; def: string; options: [string, string][] }
-  | { key: string; label: string; help?: string; kind: 'text'; def: string }
-  | { key: string; label: string; help?: string; kind: 'number'; def: number; min: number; max: number; step?: number; unit?: string };
+  | (FieldBase & { kind: 'toggle'; def: boolean })
+  | (FieldBase & { kind: 'select'; def: string; options: [string, string][] })
+  | (FieldBase & { kind: 'text'; def: string })
+  | (FieldBase & { kind: 'number'; def: number; min: number; max: number; step?: number; unit?: string });
+
+export type PanelId =
+  | 'general' | 'providers' | 'local-models' | 'routing' | 'voice' | 'memory' | 'mcp' | 'skills'
+  | 'search' | 'autonomy' | 'tool-permissions' | 'system' | 'appearance' | 'logs';
 
 export interface SectionDef {
   id: string;
   title: string;
   purpose: string;
-  /** Optional panel rendered in addition to the fields. */
-  panel?: 'providers' | 'local-models' | 'routing' | 'mcp' | 'skills' | 'search' | 'autonomy' | 'tool-permissions' | 'system' | 'logs';
+  panel?: PanelId;
   fields: FieldDef[];
 }
 
 export const SECTIONS: SectionDef[] = [
   {
-    id: 'general', title: 'General', purpose: 'Owner profile, time zone and startup behaviour.',
+    id: 'general', title: 'General', purpose: 'Owner profile, time zone, startup and the behaviour preset.', panel: 'general',
     fields: [
-      { key: 'ownerName', label: 'Owner name', kind: 'text', def: 'Owner' },
-      { key: 'timezone', label: 'Time zone', kind: 'select', def: 'Asia/Dhaka', options: [['Asia/Dhaka', 'Asia/Dhaka (UTC+6)'], ['UTC', 'UTC'], ['Europe/London', 'Europe/London']], help: 'Used for time and date answers. Tier 0 reads this value.' },
-      { key: 'preset', label: 'Preset', kind: 'select', def: 'builder', options: [['focused', 'Focused'], ['builder', 'Builder'], ['researcher', 'Researcher'], ['quiet', 'Quiet']], help: 'Presets change defaults only. They never widen permissions.' },
-      { key: 'startAtLogin', label: 'Start at login', kind: 'toggle', def: true },
-      { key: 'closeToTray', label: 'Keep running when the window closes', kind: 'toggle', def: true },
+      { key: 'ownerName', label: 'Owner name', kind: 'text', def: 'Owner', apply: 'now', help: 'Used only as a display label.' },
+      { key: 'timezone', label: 'Time zone', kind: 'select', def: 'Asia/Dhaka', apply: 'now', options: [['Asia/Dhaka', 'Asia/Dhaka (UTC+6)'], ['UTC', 'UTC'], ['Europe/London', 'Europe/London']], help: 'Tier 0 time and date answers read this value.' },
+      { key: 'language', label: 'Interface language', kind: 'select', def: 'en', apply: 'now', options: [['en', 'English (v1)']], help: 'Only English is available in v1.' },
+      { key: 'startAtLogin', label: 'Start at login', kind: 'toggle', def: true, apply: 'restart' },
+      { key: 'closeToTray', label: 'Keep running when the window closes', kind: 'toggle', def: true, apply: 'restart' },
     ],
   },
   {
     id: 'providers', title: 'Model providers', purpose: 'Which model servers EDITH may call, and what data each may receive.', panel: 'providers',
     fields: [
-      { key: 'defaultLocal', label: 'Default local provider', kind: 'select', def: 'ollama', options: [['ollama', 'Ollama'], ['llama_cpp', 'llama.cpp server']] },
-      { key: 'allowCloud', label: 'Allow cloud model providers', kind: 'toggle', def: false, help: 'Off by default. Turning it on still requires per-provider consent.' },
-      { key: 'cloudDailyLimit', label: 'Cloud spend limit per day', kind: 'number', def: 0, min: 0, max: 50, unit: 'USD' },
+      { key: 'defaultLocal', label: 'Default local provider', kind: 'select', def: 'ollama', apply: 'session', options: [['ollama', 'Ollama'], ['llama_cpp', 'llama.cpp server']] },
+      { key: 'allowCloud', label: 'Allow cloud model providers', kind: 'toggle', def: false, apply: 'session', help: 'Off by default. Each provider still needs its own consent.' },
+      { key: 'cloudDailyLimit', label: 'Cloud spend limit per day', kind: 'number', def: 0, min: 0, max: 50, unit: 'USD', apply: 'session' },
     ],
   },
   {
-    id: 'local-models', title: 'Local models', purpose: 'Local model residency and queueing. Model sizes are candidates until gate G1 closes.', panel: 'local-models',
+    id: 'local-models', title: 'Local models', purpose: 'Installed models, residency and defaults. Sizes and names are candidates until gate G1 closes.', panel: 'local-models',
     fields: [
-      { key: 'keepWarmMinutes', label: 'Keep models loaded after use', kind: 'number', def: 10, min: 0, max: 120, unit: 'min' },
-      { key: 'maxQueueDepth', label: 'Maximum queued model calls', kind: 'number', def: 4, min: 1, max: 16 },
+      { key: 'keepWarmMinutes', label: 'Keep models loaded after use', kind: 'number', def: 10, min: 0, max: 120, unit: 'min', apply: 'session' },
+      { key: 'maxQueueDepth', label: 'Maximum queued model calls', kind: 'number', def: 4, min: 1, max: 16, apply: 'session' },
     ],
   },
   {
-    id: 'routing', title: 'Routing', purpose: 'Escalation and fallback behaviour. Tier table is in the Routing screen.', panel: 'routing',
+    id: 'routing', title: 'Model routing', purpose: 'Escalation and cloud policy. The tier table and route tester are on the Routing screen.', panel: 'routing',
     fields: [
-      { key: 'tier1Confidence', label: 'Tier 1 confidence threshold', kind: 'number', def: 0.75, min: 0.5, max: 0.95, step: 0.05, help: 'Hypothesis; measured against the router evaluation set.' },
-      { key: 'cloudEscalation', label: 'Cloud escalation', kind: 'select', def: 'ask', options: [['off', 'Off'], ['ask', 'Ask per task'], ['always_tier3', 'Always for Tier 3 (requires consent)']] },
+      { key: 'tier1Confidence', label: 'Tier 1 confidence threshold', kind: 'number', def: 0.75, min: 0.5, max: 0.95, step: 0.05, apply: 'session', help: 'Hypothesis; to be measured against the router evaluation set.' },
+      { key: 'cloudEscalation', label: 'Cloud escalation', kind: 'select', def: 'ask', apply: 'session', options: [['off', 'Off'], ['ask', 'Ask per task'], ['always_tier3', 'Always for Tier 3 (requires consent)']] },
     ],
   },
   {
-    id: 'voice', title: 'Voice', purpose: 'Listening mode, speech output and barge-in. The prototype never opens a microphone.',
+    id: 'voice', title: 'Voice', purpose: 'Input and output devices, recognition engine, barge-in and privacy. The prototype never opens a microphone.', panel: 'voice',
     fields: [
-      { key: 'listenMode', label: 'Listening mode', kind: 'select', def: 'push', options: [['push', 'Push to talk'], ['toggle', 'Toggle'], ['continuous', 'Continuous (not in v1)']], help: 'Continuous listening is deferred. See security policy.' },
-      { key: 'speakReplies', label: 'Speak replies aloud', kind: 'toggle', def: true },
-      { key: 'bargeIn', label: 'Allow interrupting speech', kind: 'toggle', def: true, help: 'Needs echo protection to be reliable. Gate G5.' },
-      { key: 'diagnosticRecording', label: 'Keep voice diagnostics', kind: 'toggle', def: false, help: 'Off by default. Raw audio is never kept unless you turn this on.' },
+      { key: 'listenMode', label: 'Listening mode', kind: 'select', def: 'push', apply: 'session', options: [['push', 'Push to talk (default)'], ['toggle', 'Toggle'], ['continuous', 'Continuous (later)']], help: 'Continuous listening is deferred. See the security policy.' },
+      { key: 'speakReplies', label: 'Speak replies aloud', kind: 'toggle', def: true, apply: 'session' },
+      { key: 'bargeIn', label: 'Allow interrupting speech', kind: 'toggle', def: true, apply: 'session', help: 'Reliable barge-in needs echo protection. Gate G5.' },
+      { key: 'languageHint', label: 'Language hint', kind: 'select', def: 'en-US', apply: 'session', options: [['en-US', 'English (US)'], ['bn-BD', 'Bangla (Bangladesh)'], ['auto', 'Automatic']] },
+      { key: 'speakingRate', label: 'Speaking rate', kind: 'number', def: 100, min: 60, max: 160, step: 5, unit: '%', apply: 'session' },
+      { key: 'diagnosticRecording', label: 'Keep voice diagnostics', kind: 'toggle', def: false, apply: 'session', help: 'Off by default. Raw audio is never kept unless you turn this on.' },
     ],
   },
   {
-    id: 'memory', title: 'Memory', purpose: 'What EDITH remembers, how long, and what it may use in answers.',
+    id: 'memory', title: 'Memory', purpose: 'What EDITH remembers, how long it lasts, and what answers may use. Browse items in the Memory explorer.', panel: 'memory',
     fields: [
-      { key: 'autoExtract', label: 'Propose memories from conversation', kind: 'toggle', def: true, help: 'Proposed items wait for review. Nothing is silently saved as fact.' },
-      { key: 'useInferred', label: 'Allow unconfirmed inferred memory in answers', kind: 'toggle', def: false },
-      { key: 'workingTtlHours', label: 'Working memory lifetime', kind: 'number', def: 24, min: 1, max: 168, unit: 'h' },
-      { key: 'inferredReviewDays', label: 'Review unconfirmed inferred memory after', kind: 'number', def: 180, min: 30, max: 365, unit: 'days' },
+      { key: 'autoExtract', label: 'Propose memories from conversation', kind: 'toggle', def: true, apply: 'session', help: 'Proposed items wait for review. Nothing is silently saved as fact.' },
+      { key: 'useInferred', label: 'Allow unconfirmed inferred memory in answers', kind: 'toggle', def: false, apply: 'session' },
+      { key: 'workingTtlHours', label: 'Working memory lifetime', kind: 'number', def: 24, min: 1, max: 168, unit: 'h', apply: 'session' },
+      { key: 'inferredReviewDays', label: 'Review unconfirmed inferred memory after', kind: 'number', def: 180, min: 30, max: 365, unit: 'days', apply: 'session' },
     ],
   },
   {
-    id: 'mcp', title: 'MCP servers', purpose: 'Tool servers EDITH can use. Enable or disable them in Capabilities.', panel: 'mcp',
+    id: 'mcp', title: 'MCP integrations', purpose: 'Tool servers EDITH can use. Enable servers and tools in Capabilities.', panel: 'mcp',
     fields: [
-      { key: 'startLazily', label: 'Start servers only when needed', kind: 'toggle', def: true },
-      { key: 'maxRestarts', label: 'Maximum automatic restarts', kind: 'number', def: 5, min: 0, max: 20 },
+      { key: 'startLazily', label: 'Start servers only when needed', kind: 'toggle', def: true, apply: 'session' },
+      { key: 'maxRestarts', label: 'Maximum automatic restarts', kind: 'number', def: 5, min: 0, max: 20, apply: 'session' },
     ],
   },
   {
-    id: 'skills', title: 'Skills', purpose: 'Instruction packs. Skills guide the model; they do not enforce anything.', panel: 'skills',
+    id: 'skills', title: 'Skills', purpose: 'Instruction packs. Skills guide the model; they do not enforce anything. Manage them in Capabilities.', panel: 'skills',
     fields: [
-      { key: 'autoSelect', label: 'Select skills automatically', kind: 'toggle', def: true },
-      { key: 'maxInContext', label: 'Maximum skills per task', kind: 'number', def: 3, min: 1, max: 8 },
+      { key: 'autoSelect', label: 'Select skills automatically', kind: 'toggle', def: true, apply: 'session' },
+      { key: 'maxInContext', label: 'Maximum skills per task', kind: 'number', def: 3, min: 1, max: 8, apply: 'session' },
     ],
   },
   {
-    id: 'search', title: 'Search', purpose: 'Search providers and fetch limits. Results come from a simulated bank in this prototype.', panel: 'search',
+    id: 'search', title: 'Search', purpose: 'Search providers, authority tiers and fetch limits. Results come from a simulated reference bank.', panel: 'search',
     fields: [
-      { key: 'providerOrder', label: 'Provider order', kind: 'select', def: 'searxng', options: [['searxng', 'SearXNG first'], ['direct', 'Direct source fetch only']] },
-      { key: 'cacheHours', label: 'Cache results for', kind: 'number', def: 24, min: 0, max: 168, unit: 'h' },
-      { key: 'maxFetches', label: 'Fetches per task', kind: 'number', def: 12, min: 1, max: 200 },
+      { key: 'providerOrder', label: 'Provider order', kind: 'select', def: 'searxng', apply: 'session', options: [['searxng', 'SearXNG first'], ['direct', 'Direct source fetch only']] },
+      { key: 'cacheHours', label: 'Cache results for', kind: 'number', def: 24, min: 0, max: 168, unit: 'h', apply: 'session' },
+      { key: 'maxFetches', label: 'Fetches per task', kind: 'number', def: 12, min: 1, max: 200, apply: 'session' },
+      { key: 'fetchTimeout', label: 'Fetch timeout', kind: 'number', def: 8, min: 1, max: 60, unit: 's', apply: 'session' },
     ],
   },
   {
-    id: 'autonomy', title: 'Autonomy', purpose: 'Confirmation rules per action class. Locked rules cannot be changed.', panel: 'autonomy',
+    id: 'autonomy', title: 'Autonomy and permissions', purpose: 'Confirmation rules per action class, per-task limits, and trusted grants. Locked rules cannot be changed.', panel: 'autonomy',
     fields: [
-      { key: 'batchConfirms', label: 'Batch related confirmations', kind: 'toggle', def: true, help: 'Batching never hides which files or hosts are affected.' },
+      { key: 'batchConfirms', label: 'Batch related confirmations', kind: 'toggle', def: true, apply: 'session', help: 'Batching never hides which files or hosts are affected.' },
     ],
   },
   {
-    id: 'tool-permissions', title: 'Tool permissions', purpose: 'Native tools and their permission class.', panel: 'tool-permissions',
+    id: 'tool-permissions', title: 'Tool permissions', purpose: 'Native tools and their permission class. Overrides link to the rule that governs them.', panel: 'tool-permissions',
     fields: [],
   },
   {
-    id: 'system', title: 'System', purpose: 'Daemon, overlay and platform facts.', panel: 'system',
+    id: 'system', title: 'System', purpose: 'Daemon, socket, overlay mode and platform facts. Read-only where the prototype cannot observe the platform.', panel: 'system',
     fields: [
-      { key: 'overlayMode', label: 'Overlay mode', kind: 'select', def: 'auto', options: [['auto', 'Automatic (recommended)'], ['layer', 'Layer surface (where supported)'], ['xwayland', 'XWayland always-on-top'], ['window', 'Plain window']], help: 'Automatic picks the best available mode at start. Gate G3.' },
-      { key: 'logLevel', label: 'Log level', kind: 'select', def: 'info', options: [['debug', 'Debug'], ['info', 'Info'], ['warn', 'Warn'], ['error', 'Error']] },
+      { key: 'overlayMode', label: 'Overlay mode preference', kind: 'select', def: 'auto', apply: 'restart', options: [['auto', 'Automatic (recommended)'], ['A', 'A — layer surface (where supported)'], ['B', 'B — XWayland window'], ['C', 'C — normal window (fallback)']], help: 'Automatic picks the best mode available at start. Gate G3.' },
+      { key: 'autostart', label: 'Start the daemon at login', kind: 'toggle', def: true, apply: 'restart' },
+      { key: 'logLevel', label: 'Log level', kind: 'select', def: 'info', apply: 'now', options: [['debug', 'Debug'], ['info', 'Info'], ['warn', 'Warn'], ['error', 'Error']] },
     ],
   },
   {
-    id: 'appearance', title: 'Appearance', purpose: 'Theme, density and accessibility. Applies immediately.',
+    id: 'appearance', title: 'Theme and appearance', purpose: 'Theme, accent, density, motion and text size. Applies immediately.', panel: 'appearance',
     fields: [
-      { key: 'theme', label: 'Theme', kind: 'select', def: 'dark', options: [['dark', 'Dark'], ['light', 'Light']] },
-      { key: 'accent', label: 'Accent', kind: 'select', def: 'cyan', options: [['cyan', 'Cyan'], ['blue', 'Blue'], ['neutral', 'Neutral']] },
-      { key: 'density', label: 'Density', kind: 'select', def: 'comfortable', options: [['comfortable', 'Comfortable'], ['compact', 'Compact']] },
-      { key: 'fontScale', label: 'Text size', kind: 'number', def: 100, min: 90, max: 130, step: 5, unit: '%' },
-      { key: 'reducedMotion', label: 'Reduce motion', kind: 'toggle', def: false },
+      { key: 'theme', label: 'Theme', kind: 'select', def: 'dark', apply: 'now', options: [['dark', 'Dark (default)'], ['light', 'Light'], ['system', 'Follow system']] },
+      { key: 'accent', label: 'Accent', kind: 'select', def: 'cyan', apply: 'now', options: [['cyan', 'Cyan (default)'], ['blue', 'Blue'], ['neutral', 'Neutral'], ['ember', 'Ember (amber)']] },
+      { key: 'density', label: 'Density', kind: 'select', def: 'comfortable', apply: 'now', options: [['comfortable', 'Comfortable'], ['compact', 'Compact']] },
+      { key: 'fontScale', label: 'Text size', kind: 'number', def: 100, min: 90, max: 130, step: 5, unit: '%', apply: 'now' },
+      { key: 'reducedMotion', label: 'Reduce motion', kind: 'toggle', def: false, apply: 'now', help: 'Stops continuous animation; state changes use colour and text.' },
     ],
   },
   {
-    id: 'logs', title: 'Logs', purpose: 'Diagnostics. The export preview contains simulated entries only.', panel: 'logs',
-    fields: [],
+    id: 'logs', title: 'Logs and diagnostics', purpose: 'Log stream, task traces and the diagnostic export preview. The export preview lists exactly what is removed.', panel: 'logs',
+    fields: [
+      { key: 'logPause', label: 'Pause log stream', kind: 'toggle', def: false, apply: 'now' },
+    ],
   },
 ];
 
@@ -130,5 +150,15 @@ export function defaultSettings(): SettingsValues {
     for (const f of section.fields) values[f.key] = f.def;
     out[section.id] = values;
   }
+  // Lists used by the panels. They are plain values so they go through the same store.
+  out.search.authorityDomains = ['github.com|1', 'spec.modelcontextprotocol.io|1', 'ai.google.dev|1', 'code.claude.com|1', 'huggingface.co|2'];
+  out.voice.vocabulary = ['EDITH', 'rmcp', 'Qwen3', 'Dhaka'];
+  out.search.providerList = ['searxng', 'direct fetch'];
   return out;
 }
+
+export const APPLY_LABEL: Record<Apply, string> = {
+  now: 'Applies now',
+  session: 'Kept for this session',
+  restart: 'Needs daemon restart',
+};

@@ -1,6 +1,6 @@
-// Typed DTOs for the EDITH local API. These mirror docs/edith/EDITH_API_AND_EVENT_CONTRACTS.md.
+// Typed DTOs for the EDITH local API. They mirror docs/edith/EDITH_API_AND_EVENT_CONTRACTS.md.
 // In the prototype they are produced by mock services. Every object that originates from
-// simulation carries `simulated: true` so that UI can label it.
+// simulation carries `simulated: true` so the UI can label it.
 
 export type TaskState =
   | 'Idle' | 'Understanding' | 'ContextRetrieval' | 'Planning' | 'Routing' | 'Executing'
@@ -8,6 +8,7 @@ export type TaskState =
 
 export type Tier = 'T0' | 'T1' | 'T2' | 'T3' | 'T4';
 export type DataClass = 'Public' | 'Personal' | 'Project' | 'Secret';
+export type Locality = 'Local' | 'Cloud';
 export type Provenance = 'explicit' | 'inferred' | 'temporary' | 'assumption' | 'outdated';
 export type MemoryCategory = 'episodic' | 'semantic' | 'procedural' | 'working';
 export type MemoryStatus = 'active' | 'pending_review' | 'superseded' | 'expired' | 'deleted';
@@ -16,6 +17,7 @@ export type AutonomyClass = 'automatic' | 'policy_controlled' | 'confirm_require
 export type VerificationMode = 'mechanical' | 'evidence' | 'user_confirmed' | 'none_declared';
 export type SideEffect = 'none' | 'read' | 'write' | 'network' | 'process' | 'system';
 export type TaskIntent = 'time' | 'date' | 'calc' | 'personal' | 'research' | 'code' | 'continue' | 'chat';
+export type ChatMode = 'auto' | 'research' | 'code';
 
 export interface RouteInfo {
   id: string;
@@ -24,6 +26,7 @@ export interface RouteInfo {
   provider: string;
   model: string | null;
   dataClass: DataClass;
+  locality: Locality;
   reason: string;
   fallbacks: string[];
   latencyMs: number;
@@ -45,14 +48,16 @@ export interface EvidenceSource {
 export interface ChatMessage {
   id: string;
   role: 'owner' | 'edith' | 'system';
-  kind: 'text' | 'task' | 'approval' | 'notice';
+  kind: 'text' | 'task' | 'notice' | 'evidence';
   text: string;
   at: string;
   source: 'text' | 'voice';
   route?: RouteInfo;
   taskId?: string;
-  approvalId?: string;
+  linkedTaskId?: string;
   streaming?: boolean;
+  mode?: ChatMode;
+  contextAttached?: boolean;
   sources?: EvidenceSource[];
   simulated?: true;
 }
@@ -64,15 +69,46 @@ export interface TaskEvent {
   text: string;
 }
 
+export interface ToolCall {
+  id: string;
+  stepId: string;
+  name: string;
+  argsSummary: string;
+  status: 'running' | 'ok' | 'error';
+  startedAt: string;
+  durationMs?: number;
+  simulated: true;
+}
+
+export interface TaskError {
+  id: string;
+  at: string;
+  message: string;
+  recovery: string;
+}
+
+export interface ChangedFile {
+  path: string;
+  added: number;
+  removed: number;
+  status: 'proposed' | 'applied' | 'denied';
+  rollbackAvailable: boolean;
+}
+
 export interface TaskSubtask {
   id: string;
   label: string;
   capability: string;
+  kind: 'tool' | 'model';
   deps: string[];
   state: 'pending' | 'running' | 'done' | 'failed' | 'skipped';
   tier: Tier;
   needsApproval?: boolean;
+  failOnce?: boolean;
+  attempts: number;
   remainingTicks: number;
+  startedAt?: string;
+  finishedAt?: string;
   note?: string;
 }
 
@@ -94,6 +130,11 @@ export interface TaskRecord {
   subtasks: TaskSubtask[];
   events: TaskEvent[];
   verdicts: Verdict[];
+  tools: ToolCall[];
+  errors: TaskError[];
+  evidence: EvidenceSource[];
+  changedFiles: ChangedFile[];
+  unresolved: string[];
   route?: RouteInfo;
   outcome?: 'completed' | 'failed' | 'cancelled';
   blocker?: string;
@@ -108,6 +149,14 @@ export interface ApprovalRequest {
   preview: string;
   autonomy: AutonomyClass;
   status: 'pending' | 'approved' | 'denied';
+  scope?: 'once' | 'task' | 'project';
+  decidedAt?: string;
+}
+
+export interface MemoryVersion {
+  version: number;
+  content: string;
+  at: string;
 }
 
 export interface MemoryItem {
@@ -120,6 +169,8 @@ export interface MemoryItem {
   userConfirmed: boolean;
   status: MemoryStatus;
   sources: string[];
+  related: string[];
+  history: MemoryVersion[];
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -156,6 +207,8 @@ export interface McpServer {
   reason?: string;
   enabled: boolean;
   tools: McpTool[];
+  resources: string[];
+  prompts: string[];
   history: CapabilityCall[];
   simulated: true;
 }
@@ -188,6 +241,18 @@ export interface ProviderInfo {
   simulated: true;
 }
 
+export interface LocalModel {
+  id: string;
+  provider: string;
+  name: string;
+  sizeGB: number;
+  quant: string;
+  contextTokens: number;
+  toolCalling: 'declared' | 'unknown';
+  loaded: boolean;
+  simulated: true;
+}
+
 export interface TierConfig {
   tier: Tier;
   label: string;
@@ -207,14 +272,16 @@ export interface RoutingEvent {
   id: string;
   at: string;
   severity: 'info' | 'warn' | 'error';
+  kind: 'fallback' | 'degraded' | 'route_change' | 'probe';
   text: string;
 }
 
 export interface RoutingState {
   providers: ProviderInfo[];
+  models: LocalModel[];
   tiers: TierConfig[];
-  recent: RouteInfo[];
   categories: CategoryStat[];
+  recent: RouteInfo[];
   events: RoutingEvent[];
   requests24h: number;
   noModelShare: number;
@@ -249,9 +316,17 @@ export interface PolicyLimits {
   budgetMinutes: number;
 }
 
+export interface TrustGrant {
+  id: string;
+  scope: string;
+  grantedAt: string;
+  expiresAt: string;
+}
+
 export interface VoiceSnapshot {
   state: 'Off' | 'Idle' | 'Listening' | 'Transcribing' | 'Finalising' | 'Dispatching' | 'Thinking' | 'Speaking' | 'Interrupted';
   partial: string;
+  finalText: string;
   level: number;
   device: string;
   engine: 'whisper_local' | 'gemini_live_cloud';
@@ -276,4 +351,12 @@ export interface LogEntry {
   subsystem: string;
   message: string;
   traceId: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  at: string;
+  severity: 'info' | 'ok' | 'warn' | 'error';
+  text: string;
+  taskId?: string;
 }

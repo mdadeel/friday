@@ -1,20 +1,18 @@
 import { Store } from '../store';
-import type { ConversationService, DiagnosticsService, MemoryService, RoutingService, TaskService } from '../contracts';
-import type { ChatMessage } from '../../types/contracts';
+import type { ConversationService, DiagnosticsService, MemoryService, RoutingService, SendOptions, TaskService } from '../contracts';
+import type { ChatMessage, TaskIntent } from '../../types/contracts';
 import { buildRoute, classifyIntent, DISPLAY_TZ, evaluateExpression, formatInDisplayTz, tier0Match } from './logic';
 import { nextId, nowIso } from './ids';
 
-const WELCOME: ChatMessage = {
+const welcome = (): ChatMessage => ({
   id: 'msg-welcome',
   role: 'edith',
   kind: 'notice',
-  text:
-    'EDITH prototype. Everything here is simulated: no model, microphone, search or device is connected. ' +
-    'Try "What time is it?", "what is 12 * (3 + 4)", "Who am I?", or "Research the best architecture for our MCP host".',
+  text: 'Prototype. Nothing here calls a model, microphone, search engine or device. Time, arithmetic, memory answers and task plans are simulated or computed in the browser.',
   at: nowIso(),
   source: 'text',
   simulated: true,
-};
+});
 
 const STREAM_MS = 35;
 
@@ -25,17 +23,17 @@ export function createConversationService(deps: {
   diag: DiagnosticsService;
   onReplyComplete: (text: string, source: 'text' | 'voice') => void;
 }): ConversationService {
-  const store = new Store<ChatMessage[]>([WELCOME]);
+  const store = new Store<ChatMessage[]>([welcome()]);
   let streamHandle: ReturnType<typeof setInterval> | null = null;
 
   const append = (m: ChatMessage): void => {
     store.set((list) => [...list, m]);
   };
 
-  const streamReply = (text: string, route: ReturnType<typeof buildRoute>, source: 'text' | 'voice'): void => {
+  const streamReply = (text: string, route: ReturnType<typeof buildRoute>, source: 'text' | 'voice', linkedTaskId?: string): void => {
     const id = nextId('msg');
     const words = text.split(/(\s+)/);
-    append({ id, role: 'edith', kind: 'text', text: '', at: nowIso(), source, route, streaming: true, simulated: true });
+    append({ id, role: 'edith', kind: 'text', text: '', at: nowIso(), source, route, streaming: true, linkedTaskId, simulated: true });
     let i = 0;
     if (streamHandle) clearInterval(streamHandle);
     streamHandle = setInterval(() => {
@@ -49,6 +47,8 @@ export function createConversationService(deps: {
       }
     }, STREAM_MS);
   };
+
+  const latestTaskId = (): string | undefined => deps.tasks.get()[0]?.id;
 
   const handleTier0 = (text: string, source: 'text' | 'voice'): void => {
     const hit = tier0Match(text);
@@ -73,12 +73,17 @@ export function createConversationService(deps: {
     streamReply(answer, route, source);
   };
 
-  const send = (raw: string, source: 'text' | 'voice' = 'text'): void => {
+  const send = (raw: string, source: 'text' | 'voice' = 'text', options: SendOptions = {}): void => {
     const text = raw.trim();
     if (!text) return;
-    append({ id: nextId('msg'), role: 'owner', kind: 'text', text, at: nowIso(), source });
+    const mode = options.mode ?? 'auto';
+    append({ id: nextId('msg'), role: 'owner', kind: 'text', text, at: nowIso(), source, mode, contextAttached: Boolean(options.attachContext) });
 
-    const intent = classifyIntent(text);
+    let intent: TaskIntent = classifyIntent(text);
+    if (mode === 'research') intent = 'research';
+    if (mode === 'code') intent = 'code';
+    const followUp = /\b(continue that|that task|the last task|continue this)\b/i.test(text) ? latestTaskId() : undefined;
+
     if (intent === 'time' || intent === 'date' || intent === 'calc') {
       handleTier0(text, source);
       return;
@@ -99,10 +104,10 @@ export function createConversationService(deps: {
       const taskId = deps.tasks.start(text, intent, source, route);
       append({ id: nextId('msg'), role: 'edith', kind: 'task', text: '', at: nowIso(), source, taskId, simulated: true });
       streamReply(
-        `Started a simulated task. Route: ${route.tier} · ${route.model ?? 'no model'}. ` +
-          'The plan, approvals and verification are shown in the Now panel and in Activity. Nothing external is touched.',
+        `Started a simulated task. Route: ${route.tier} · ${route.model ?? 'no model'}. The plan, tools, approvals and verification are in the Activity panel. Nothing external is touched.`,
         route,
         source,
+        followUp,
       );
       return;
     }
@@ -110,18 +115,17 @@ export function createConversationService(deps: {
     const route = buildRoute(nextId('rt'), nowIso(), 'chat', 0);
     deps.routing.record(route);
     streamReply(
-      '[SIMULATED] No model is connected in this prototype, so I cannot give a real answer. ' +
-        'In the real system this request would go to the Tier 2 route shown below. ' +
-        'Requests about time, arithmetic, your memory, research or code tasks do run in this prototype.',
+      'No model is connected in this prototype, so there is no real answer to give. The real system would send this to the Tier 2 route shown below. Time, arithmetic, memory questions and task plans do run here.',
       route,
       source,
+      followUp,
     );
   };
 
   const reset = (): void => {
     if (streamHandle) clearInterval(streamHandle);
     streamHandle = null;
-    store.set(() => [{ ...WELCOME, id: nextId('msg'), at: nowIso() }]);
+    store.set(() => [welcome()]);
   };
 
   return { get: store.get, subscribe: store.subscribe, send, reset };

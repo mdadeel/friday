@@ -6,9 +6,11 @@ import type {
   AuditEntry,
   CapabilityKind,
   ChatMessage,
+  ChatMode,
   LogEntry,
   MemoryItem,
   McpServer,
+  NotificationItem,
   PolicyLimits,
   PolicyRule,
   RouteInfo,
@@ -18,6 +20,7 @@ import type {
   TaskIntent,
   TaskRecord,
   Tier,
+  TrustGrant,
   VoiceSnapshot,
 } from '../types/contracts';
 
@@ -26,8 +29,13 @@ export interface Observable<T> {
   subscribe(listener: () => void): () => void;
 }
 
+export interface SendOptions {
+  mode?: ChatMode;
+  attachContext?: boolean;
+}
+
 export interface ConversationService extends Observable<ChatMessage[]> {
-  send(text: string, source?: 'text' | 'voice'): void;
+  send(text: string, source?: 'text' | 'voice', options?: SendOptions): void;
   reset(): void;
 }
 
@@ -35,7 +43,7 @@ export interface TaskService extends Observable<TaskRecord[]> {
   start(objective: string, intent: TaskIntent, origin: 'text' | 'voice', route: RouteInfo): string;
   cancel(taskId: string): void;
   approvals: Observable<ApprovalRequest[]>;
-  decide(approvalId: string, decision: 'approve' | 'deny'): void;
+  decide(approvalId: string, decision: 'approve' | 'deny', scope?: 'once' | 'task' | 'project'): void;
 }
 
 export interface VoiceService extends Observable<VoiceSnapshot> {
@@ -51,12 +59,16 @@ export interface MemoryService extends Observable<MemoryItem[]> {
   confirm(id: string): void;
   reject(id: string): void;
   remove(id: string): void;
+  forgetAll(): void;
+  restoreSamples(): void;
   whoAmI(): { text: string; usedIds: string[] };
 }
 
 export interface RoutingService extends Observable<RoutingState> {
   record(route: RouteInfo): void;
   setTier(tier: Tier, patch: { provider?: string; model?: string }): void;
+  setFallbacks(tier: Tier, fallbacks: string[]): void;
+  setModelLoaded(id: string, loaded: boolean): void;
   probe(providerId: string): void;
   testRoute(text: string): RouteInfo | null;
 }
@@ -79,14 +91,17 @@ export interface PolicyState {
   rules: PolicyRule[];
   limits: PolicyLimits;
   audit: AuditEntry[];
+  trusts: TrustGrant[];
 }
 
 export interface PolicyService extends Observable<PolicyState> {
   setAutonomy(ruleId: string, autonomy: PolicyRule['autonomy']): void;
   setLimit(key: keyof PolicyLimits, value: number): void;
+  grantTrust(scope: string, days: number): void;
+  revokeTrust(id: string): void;
 }
 
-export type SettingValue = string | number | boolean;
+export type SettingValue = string | number | boolean | string[];
 export type SettingsValues = Record<string, Record<string, SettingValue>>;
 
 export interface SettingsService extends Observable<SettingsValues> {
@@ -103,6 +118,11 @@ export interface DiagnosticsService extends Observable<LogEntry[]> {
   exportPreview(): string;
 }
 
+export interface NotificationService extends Observable<NotificationItem[]> {
+  push(text: string, severity: NotificationItem['severity'], taskId?: string): void;
+  dismiss(id: string): void;
+}
+
 export interface Services {
   conversation: ConversationService;
   tasks: TaskService;
@@ -114,4 +134,5 @@ export interface Services {
   settings: SettingsService;
   search: SearchService;
   diagnostics: DiagnosticsService;
+  notifications: NotificationService;
 }
