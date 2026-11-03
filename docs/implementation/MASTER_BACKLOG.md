@@ -99,10 +99,23 @@
 
 | Task ID | Component | Description | Status | Verification Criteria |
 |---------|-----------|-------------|--------|-----------------------|
-| **TSK-901** | `edith-search` | Search provider trait and result representation (`SearchResult`, snippets, URLs, engine metadata) | Planned | Unit tests for search models and results pass |
-| **TSK-902** | `edith-search` | DuckDuckGo / SearXNG search engine adapter with rate limiting and timeout management | Planned | Search integration tests return structured results |
-| **TSK-903** | `edith-search` | Web page content extractor and reader (HTML -> clean markdown / plain text, readable text extraction) | Planned | Extraction tests against real/fixture HTML pass |
-| **TSK-904** | `edith-tools` | Register search and web fetch capabilities (`web.search`, `web.fetch`) into `ToolRegistry` with `PolicyEngine` controls | Planned | Security policy blocks private LAN / local IP targets |
-| **TSK-905** | `edith-api` | Search endpoints (`POST /v1/search`, `POST /v1/search/fetch`) and research task orchestration | Planned | API integration tests pass |
+| **TSK-901** | `edith-search` | Search provider trait and result representation (`SearchResult`, snippets, URLs, engine metadata) | **Completed** | Unit tests for search models and results pass |
+| **TSK-902** | `edith-search` | DuckDuckGo / SearXNG search engine adapter with rate limiting and timeout management | **Completed** | Search integration tests return structured results |
+| **TSK-903** | `edith-search` | Web page content extractor and reader (HTML -> clean markdown / plain text, readable text extraction) | **Completed** | Extraction tests against real/fixture HTML pass |
+| **TSK-904** | `edith-tools` | Register search and web fetch capabilities (`web.search`, `web.fetch`) into `ToolRegistry` with `PolicyEngine` controls | **Completed** | Security policy blocks private LAN / local IP targets |
+| **TSK-905** | `edith-api` | Search endpoints (`POST /v1/search`, `POST /v1/search/fetch`, `POST /v1/search/evidence`) and research task orchestration | **Completed** | API integration tests pass |
+
+---
+
+## Epic 10: Desktop Environment Integrations (Phase 10)
+
+| Task ID | Component | Description | Status | Verification Criteria |
+|---------|-----------|-------------|--------|-----------------------|
+| **TSK-1001** | `edith-desktop` | System metrics collector (CPU load, RAM usage, storage mounts, system uptime) | Planned | Unit and integration tests report valid host telemetry |
+| **TSK-1002** | `edith-desktop` | Application discovery and launcher (`.desktop` entries on GNOME/Linux, binary execution) | Planned | App launcher resolves installed desktop applications |
+| **TSK-1003** | `edith-desktop` | Window manager inspection abstraction (GNOME Shell / Wayland / X11 active window tracking) | Planned | Active window queries return current workspace info |
+| **TSK-1004** | `edith-tools` | Register desktop tools (`desktop.launch_app`, `desktop.system_metrics`, `desktop.active_window`) into `ToolRegistry` | Planned | ToolRegistry contains desktop capabilities under policy controls |
+| **TSK-1005** | `edith-api` | Desktop environment endpoints (`GET /v1/desktop/metrics`, `GET /v1/desktop/apps`, `POST /v1/desktop/launch`) | Planned | API integration tests pass |
+
 
 

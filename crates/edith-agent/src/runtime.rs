@@ -49,6 +49,29 @@ impl AgentRuntime {
         }
     }
 
+    pub fn with_tools(
+        storage: Storage,
+        event_bus: EventBus,
+        models: ProviderRegistry,
+        tool_registry: edith_tools::ToolRegistry,
+    ) -> Self {
+        let executor = Arc::new(ExecutionEngine::with_tools(
+            event_bus.clone(),
+            tool_registry,
+            edith_tools::policy::PolicyEngine::default(),
+        ));
+        let router = Arc::new(ModelRouter::new(storage.clone(), event_bus.clone(), models.clone()));
+        let memory = Arc::new(MemoryService::new(storage.clone(), event_bus.clone()));
+        Self {
+            storage,
+            event_bus,
+            models,
+            router,
+            executor,
+            memory,
+        }
+    }
+
     pub fn memory(&self) -> Arc<MemoryService> {
         self.memory.clone()
     }

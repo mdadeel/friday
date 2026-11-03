@@ -17,6 +17,7 @@ use edith_models::ProviderRegistry;
 use edith_storage::Storage;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use edith_search::{SearchService, WebFetchTool, WebSearchTool};
 use edith_voice::{MockSpeechRecognizer, MockSpeechSynthesizer, VoiceManager, VoiceStatus};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -34,6 +35,7 @@ pub struct AppState {
     pub models: ProviderRegistry,
     pub agent: AgentRuntime,
     pub voice: Arc<VoiceManager>,
+    pub search: Arc<SearchService>,
     pub active_cancellations: Arc<RwLock<HashMap<String, CancellationToken>>>,
     pub auth_token: Option<String>,
 }
@@ -45,19 +47,32 @@ impl AppState {
         models: ProviderRegistry,
         auth_token: Option<String>,
     ) -> Self {
-        let agent = AgentRuntime::new(storage.clone(), event_bus.clone(), models.clone());
+        let search = Arc::new(SearchService::default());
+        let mut tool_registry = edith_tools::ToolRegistry::with_builtins();
+        tool_registry.register(Arc::new(WebSearchTool::new(search.clone())));
+        tool_registry.register(Arc::new(WebFetchTool::new(search.clone())));
+
+        let agent = AgentRuntime::with_tools(
+            storage.clone(),
+            event_bus.clone(),
+            models.clone(),
+            tool_registry,
+        );
+
         let voice = Arc::new(VoiceManager::new(
             edith_core::config::VoiceConfig::default(),
             Some(event_bus.clone()),
             Arc::new(MockSpeechRecognizer::default()),
             Arc::new(MockSpeechSynthesizer),
         ));
+
         Self {
             storage,
             event_bus,
             models,
             agent,
             voice,
+            search,
             active_cancellations: Arc::new(RwLock::new(HashMap::new())),
             auth_token,
         }
@@ -65,6 +80,11 @@ impl AppState {
 
     pub fn with_voice(mut self, voice: Arc<VoiceManager>) -> Self {
         self.voice = voice;
+        self
+    }
+
+    pub fn with_search(mut self, search: Arc<SearchService>) -> Self {
+        self.search = search;
         self
     }
 }
@@ -147,6 +167,24 @@ pub struct TtsRequest {
     pub text: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchRequest {
+    pub query: String,
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FetchRequest {
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EvidenceRequest {
+    pub url: String,
+    pub claim: String,
+    pub quote: String,
+}
+
 pub fn create_router(state: AppState) -> Router {
     let auth_token = state.auth_token.clone();
 
@@ -187,6 +225,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/v1/voice/cancel", post(voice_cancel_handler))
         .route("/v1/voice/audio", post(voice_audio_handler))
         .route("/v1/voice/tts", post(voice_tts_handler))
+        .route("/v1/search", post(search_handler))
+        .route("/v1/search/fetch", post(fetch_handler))
+        .route("/v1/search/evidence", post(evidence_handler))
         .route("/v1/events", get(events_ws_handler))
         .layer(middleware::from_fn(move |headers, req, next| {
             let token = auth_token.clone();
@@ -779,6 +820,55 @@ async fn voice_tts_handler(
         "sample_rate": audio.sample_rate,
         "samples_count": audio.pcm_samples.len(),
     })))
+}
+
+async fn search_handler(
+    State(state): State<AppState>,
+    Json(req): Json<SearchRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let results = state
+        .search
+        .search(&req.query, req.limit.unwrap_or(5))
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::to_value(results).unwrap_or_default()))
+}
+
+async fn fetch_handler(
+    State(state): State<AppState>,
+    Json(req): Json<FetchRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let doc = state
+        .search
+        .fetch(&req.url)
+        .await
+        .map_err(|e| match e {
+            edith_search::SearchError::SsrfBlocked(msg) => (StatusCode::FORBIDDEN, msg),
+            edith_search::SearchError::InvalidUrl(msg) => (StatusCode::BAD_REQUEST, msg),
+            edith_search::SearchError::ContentTooLarge { .. } => {
+                (StatusCode::PAYLOAD_TOO_LARGE, e.to_string())
+            }
+            _ => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        })?;
+    Ok(Json(serde_json::to_value(doc).unwrap_or_default()))
+}
+
+async fn evidence_handler(
+    State(state): State<AppState>,
+    Json(req): Json<EvidenceRequest>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let doc = state
+        .search
+        .fetch(&req.url)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let span = state
+        .search
+        .extract_evidence(&doc, &req.claim, &req.quote)
+        .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e.to_string()))?;
+
+    Ok(Json(serde_json::to_value(span).unwrap_or_default()))
 }
 
 #[cfg(test)]

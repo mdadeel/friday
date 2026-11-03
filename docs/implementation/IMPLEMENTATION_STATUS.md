@@ -18,8 +18,8 @@
 | **Phase 6** | Tool & MCP Infrastructure | **Verified Done** | 50 workspace tests pass; live `/v1/tools` verified | `edith-tools` & `edith-mcp` crates, `Tool` trait, `PolicyEngine`, built-in tools (fs, command, datetime), `StdioMcpClient`, MCP adapter, execution integration |
 | **Phase 7** | Persistent Memory | **Verified Done** | 56 workspace tests pass; live memory CRUD verified | `edith-memory` crate, migration 0003, provenance rules, secret gatekeeper, episodic event logging, context injection |
 | **Phase 8** | Voice Engine | **Verified Done** | 76 workspace tests pass; live voice endpoints verified | `edith-voice` crate, 16 kHz audio buffer, VAD state machine, mic privacy gatekeeper, Whisper ASR adapter, TTS pipeline, barge-in controller, `/v1/voice/*` |
-| **Phase 9** | Search & Research Infrastructure | **Ready** | Next milestone | Search providers, web fetcher, evidence extraction |
-| **Phase 10** | Desktop Environment Integrations | Planned | Pending Phase 9 | Linux FS, terminal, processes |
+| **Phase 9** | Search & Research Infrastructure | **Verified Done** | 85 workspace tests pass; live search verified | `edith-search` crate, SSRF protection, HTML content extractor, evidence verification, DuckDuckGo & mock fallback, tools `web.search` & `web.fetch`, `/v1/search/*` |
+| **Phase 10** | Desktop Environment Integrations | **Ready** | Next milestone | Linux FS, terminal, processes, system metrics, desktop apps |
 | **Phase 11** | Full Interface & Desktop Shell | Planned | Pending Phase 10 | Tauri desktop shell & prototype hookup |
 | **Phase 12** | Testing, Hardening & Evaluation | Planned | Continuous | Unit, contract, benchmark suites |
 
@@ -42,5 +42,6 @@
 | `crates/edith-mcp` | YES | YES | YES | YES (3 tests) | YES (JSON-RPC 2.0, MCP client, adapter) |
 | `crates/edith-memory` | YES | YES | YES | YES (5 tests) | YES (Provenance, gatekeeper, context builder) |
 | `crates/edith-voice` | YES | YES | YES | YES (19 tests) | YES (VAD, ASR, TTS, Barge-in, Privacy) |
-| `crates/edith-api` | YES | YES | YES | YES (8 tests) | YES (Voice sessions, memory CRUD, tools) |
+| `crates/edith-search` | YES | YES | YES | YES (8 tests) | YES (SSRF defense, extractor, evidence verifier, web tools) |
+| `crates/edith-api` | YES | YES | YES | YES (8 tests) | YES (Voice sessions, memory CRUD, tools, search) |
 | `apps/daemon` | YES | YES | YES | YES (Live run) | YES (Dual Unix & TCP socket) |

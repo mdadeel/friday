@@ -583,3 +583,89 @@ async fn test_voice_api_endpoints_and_privacy() {
     assert_eq!(val["sample_rate"], 16000);
 }
 
+#[tokio::test]
+async fn test_search_endpoints_and_ssrf_protection() {
+    let storage = Storage::open_in_memory().expect("Storage in-memory open failed");
+    let event_bus = EventBus::new(64);
+    let models = ProviderRegistry::new();
+    models
+        .register(Arc::new(MockProvider::default()))
+        .await;
+
+    let state = AppState::new(storage.clone(), event_bus, models, None);
+    let app = create_router(state);
+
+    // 1. POST /v1/search returns candidate results
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/search")
+                .header("Content-Type", "application/json")
+                .body(Body::from(r#"{"query": "Rust language", "limit": 2}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(val.is_array());
+    let arr = val.as_array().unwrap();
+    assert_eq!(arr.len(), 2);
+    assert!(arr[0]["title"].is_string());
+    assert!(arr[0]["url"].is_string());
+
+    // 2. SSRF Protection: POST /v1/search/fetch with localhost MUST return 403 Forbidden
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/search/fetch")
+                .header("Content-Type", "application/json")
+                .body(Body::from(r#"{"url": "http://127.0.0.1:4242/admin"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+    // 3. GET /v1/tools contains web.search and web.fetch
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/tools")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let val: Value = serde_json::from_slice(
+        &axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    let tools = val["tools"].as_array().unwrap();
+    let tool_names: Vec<&str> = tools
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
+
+    assert!(tool_names.contains(&"web.search"));
+    assert!(tool_names.contains(&"web.fetch"));
+    assert_eq!(tool_names.len(), 7); // 5 native + 2 web
+}
+
+

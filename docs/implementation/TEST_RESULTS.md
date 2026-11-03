@@ -122,4 +122,11 @@
       - `POST /v1/voice/stop`: manual endpoint -> transcribed audio -> returned `TranscriptionResult` (`confidence: 0.95`, `text: "Spoken audio captured: 2400 samples (150ms)"`) -> transitioned to `thinking`, microphone immediately closed.
     - Speech Synthesis (TTS):
       - `POST /v1/voice/tts` with `"Hello owner, EDITH is ready to assist you."` -> synthesized 32,000 samples (2000 ms PCM audio @ 16 kHz) with sentence segmentation and markdown sanitization.
+  - **Search & Research Infrastructure & SSRF Protection (Phase 9)**:
+    - Registered Tools: `GET /v1/tools` enumerates 7 tools including `web.search` and `web.fetch`.
+    - Live Search: `POST /v1/search` with `{"query": "Rust Tokio async programming", "max_results": 3}` returns query results with source snippets and structured `EvidenceBlock` entries.
+    - SSRF Attack Denial: `POST /v1/search/fetch` targeting `http://127.0.0.1:4242/v1/health` and `http://localhost/secret` correctly rejected with `403 Forbidden` (`SSRF blocked: IPv4 address '127.0.0.1' is in a private/local range`), proving zero-trust network boundaries.
+    - Public Fetch & Evidence Extraction: `POST /v1/search/fetch` with valid URL extracts sanitized content, removes `<head>/<script>/<style>`, computes SHA-256 hash, and chunks into traceable evidence blocks.
+    - Evidence Verification: `POST /v1/search/evidence` validates exact quote matches against the document content hash; rejects fabricated or mismatched quotes (`EvidenceMismatch`).
+
 

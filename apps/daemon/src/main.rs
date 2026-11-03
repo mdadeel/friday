@@ -94,14 +94,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tts,
     ));
 
-    // 8. Build API Router
+    // 8. Initialize Search & Research Infrastructure
+    info!("Initializing Search & Research Infrastructure...");
+    let search = std::sync::Arc::new(edith_search::SearchService::default());
+
+    // 9. Build API Router
     let app_state = AppState::new(
         storage,
         event_bus.clone(),
         provider_registry,
         Some(auth_token.clone()),
     )
-    .with_voice(voice);
+    .with_voice(voice)
+    .with_search(search);
     let router = create_router(app_state);
 
     // 7. Start Listeners

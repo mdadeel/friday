@@ -11,6 +11,7 @@ members = [
     "crates/edith-mcp",
     "crates/edith-memory",
     "crates/edith-voice",
+    "crates/edith-search",
     "crates/edith-api",
     "apps/daemon",
 ]
@@ -32,6 +33,7 @@ edith-tools = { path = "crates/edith-tools" }
 edith-mcp = { path = "crates/edith-mcp" }
 edith-memory = { path = "crates/edith-memory" }
 edith-voice = { path = "crates/edith-voice" }
+edith-search = { path = "crates/edith-search" }
 edith-api = { path = "crates/edith-api" }
 
 async-trait = { version = "0.1" }

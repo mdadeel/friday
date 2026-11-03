@@ -1,5 +1,37 @@
 # EDITH 2.0 — Engineering Changelog
 
+## [0.9.0] - 2026-11-03
+
+### Phase 9: Search & Research Infrastructure
+- Created crate [`crates/edith-search`](crates/edith-search):
+  - **Safe Web Fetcher & SSRF Defense** (`fetcher.rs`):
+    - Strict SSRF policy blocking non-routable, loopback, private RFC 1918 IPv4 ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local (`169.254.0.0/16`), and unique-local IPv6 (`fc00::/7`, `::1`).
+    - Enforced connection/read timeouts (default 10s) and body response cap (5 MB).
+    - Blocks non-HTTP/HTTPS schemes and disallows private DNS name patterns.
+  - **HTML Content Extractor & Markdown Normalization** (`extractor.rs`):
+    - Strips non-content tags (`<head>`, `<script>`, `<style>`, `<nav>`, `<header>`, `<footer>`, `<iframe>`).
+    - Converts HTML headings, paragraphs, and list items into structured text blocks while collapsing whitespace.
+    - Generates SHA-256 document content hashes and chunks extracted text into stable `EvidenceBlock` entries (`{hash_prefix}:{index}`).
+  - **Evidence Verification Contract** (`evidence.rs`):
+    - `EvidenceVerifier` validating that cited snippets or claims strictly match the underlying source document text.
+    - Prevents model hallucinations by rejecting evidence where the quote cannot be verified verbatim against the document hash (`EvidenceMismatch`).
+  - **Multi-Provider Search Service** (`service.rs`):
+    - Implemented `DuckDuckGoProvider` with automated fallback to `MockSearchProvider` when offline or unconfigured.
+    - Parallel page fetch, extraction, and evidence compilation.
+  - **Native Agent Tools** (`tools.rs`):
+    - Implemented `WebSearchTool` (`web.search`): queries search engine, fetches top results, extracts text snippets and structured evidence blocks.
+    - Implemented `WebFetchTool` (`web.fetch`): safely retrieves public web pages with SSRF validation, returns extracted text blocks and SHA-256 content hashes.
+- API and Daemon Integration:
+  - Registered `web.search` and `web.fetch` into the `ToolRegistry` (raising total registered tools to 7).
+  - Added search API endpoints to `edith-api`: `POST /v1/search`, `POST /v1/search/fetch`, `POST /v1/search/evidence`.
+  - Initialized `SearchService` and configured `AgentRuntime` with search tools in `apps/daemon/src/main.rs`.
+- Verification & Testing:
+  - 9 new tests added (8 in `edith-search` + 1 integration test in `edith-api`).
+  - Workspace test suite passes with **85 tests passing** across all 12 crates.
+  - Live daemon tested with curl: `GET /v1/tools` lists `web.search` and `web.fetch`; `POST /v1/search` returns structured search results; `POST /v1/search/fetch` against `127.0.0.1` is blocked with `403 Forbidden` (`SSRF blocked`).
+
+---
+
 ## [0.8.0] - 2026-11-03
 
 ### Phase 8: Voice Engine
