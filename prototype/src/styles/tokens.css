@@ -1,84 +1,93 @@
-/* Design tokens. Mirrors docs/edith/EDITH_FRONTEND_DESIGN_SYSTEM.md (CSS variables, no Tailwind). */
+/* Design tokens. Values follow docs/edith/EDITH_FRONTEND_DESIGN_SYSTEM.md §3.
+   Dark is the default. Light is defined from the same token names. Accents are overridden by data-accent. */
 :root {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 187 68% 52%;
-  --primary-foreground: 190 60% 5%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent-hsl: 187 68% 52%;
-  --accent-foreground: 190 60% 5%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 187 68% 52%;
-  --radius: 0.75rem;
+  /* Surfaces (dark) */
+  --surface-0: #0B0D10;
+  --surface-1: #12151A;
+  --surface-2: #1A1E25;
+  --surface-3: #232933;
+  --line-1: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.14);
+  --text-1: #E8ECF2;
+  --text-2: #A4ADBB;
+  --text-3: #6B7487;
+  --accent: #4FC3E0;
+  --accent-2: #6C8CFF;
+  --accent-soft: rgba(79, 195, 224, 0.14);
+  --accent-ink: #04161C;
+  --ok: #4CC38A;
+  --warn: #E0B04F;
+  --error: #E06C6C;
+  --sim: #B58CFF;
+  --ok-soft: rgba(76, 195, 138, 0.12);
+  --warn-soft: rgba(224, 176, 79, 0.12);
+  --error-soft: rgba(224, 108, 108, 0.12);
+  --sim-soft: rgba(181, 140, 255, 0.10);
+  --scrim: rgba(5, 6, 8, 0.6);
+  --shadow-float: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --glow: 0 0 24px rgba(79, 195, 224, 0.22);
 
-  --sidebar-background: 222.2 84% 4.9%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-primary: 187 68% 52%;
-  --sidebar-primary-foreground: 190 60% 5%;
-  --sidebar-accent: 217.2 32.6% 17.5%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-border: 217.2 32.6% 17.5%;
-  --sidebar-ring: 187 68% 52%;
-
-  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Bengali", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  /* Typography (§3.2) */
+  --font-ui: Inter, system-ui, -apple-system, "Segoe UI", Cantarell, Roboto, "Noto Sans", "Noto Sans Bengali", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-meta: 11px;
+  --fs-small: 13px;
+  --fs-body: 14px;
+  --fs-lead: 16px;
+  --fs-section: 20px;
+  --fs-display: 28px;
   --font-scale: 1;
 
-  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
-  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
-  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent);
-  --transition: 160ms ease;
+  /* Space, radius (§3.3) */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
+  --r-control: 6px;
+  --r-panel: 10px;
+  --r-overlay: 14px;
 
-  /* dark theme (default) */
-  --bg: #0d1117;
-  --bg-raised: #151b24;
-  --bg-sunk: #0a0e14;
-  --border: #263041;
-  --text: #e6edf3;
-  --text-muted: #9aa7b8;
-  --text-faint: #6d7a8c;
-  --warn-text: #f0b44c;
-  --ok: #3fb985;
-  --warn: #e7a33e;
-  --error: #ef6461;
-  --info: #5aa8f0;
-  --sim: #b48cf2;
-
-  --accent: #37c2d6;
-  --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
-  --accent-text: #061114;
+  /* Motion (§3.4) */
+  --motion-fast: 120ms ease-out;
+  --motion-base: 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-slow: 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --rail-w: 248px;
+  --activity-w: 360px;
 }
 
 :root[data-theme='light'] {
-  --bg: #f6f7f9;
-  --bg-raised: #ffffff;
-  --bg-sunk: #eceff3;
-  --border: #d5dbe3;
-  --text: #15191f;
-  --text-muted: #4c5868;
-  --text-faint: #6d7a8c;
-  --warn-text: #8a5300;
-  --ok: #17784b;
-  --warn: #9a5f00;
-  --error: #b42323;
-  --info: #1b5fb0;
-  --sim: #6b3fbf;
+  --surface-0: #F4F5F7;
+  --surface-1: #FFFFFF;
+  --surface-2: #EEF1F5;
+  --surface-3: #E1E6ED;
+  --line-1: rgba(15, 20, 30, 0.08);
+  --line-2: rgba(15, 20, 30, 0.16);
+  --text-1: #111418;
+  --text-2: #444C5A;
+  --text-3: #5E6677;
+  --accent: #0E7C93;
+  --accent-2: #3554D1;
+  --accent-soft: rgba(14, 124, 147, 0.10);
+  --accent-ink: #FFFFFF;
+  --ok: #17784B;
+  --warn: #8A5A00;
+  --error: #B42323;
+  --sim: #6D3FC0;
+  --ok-soft: rgba(23, 120, 75, 0.09);
+  --warn-soft: rgba(138, 90, 0, 0.09);
+  --error-soft: rgba(180, 35, 35, 0.08);
+  --sim-soft: rgba(109, 63, 192, 0.08);
+  --scrim: rgba(20, 24, 32, 0.35);
+  --shadow-float: 0 14px 40px rgba(15, 20, 30, 0.14);
+  --glow: 0 0 22px rgba(14, 124, 147, 0.18);
 }
 
-:root[data-accent='blue'] { --accent: #4c8dff; --accent-text: #ffffff; }
-:root[data-accent='neutral'] { --accent: #aeb8c6; --accent-text: #0d1117; }
-:root[data-accent='cyan'] { --accent: #37c2d6; }
+/* Accents: cyan is the default. Ember is an extra option (reference image 3). */
+:root[data-accent='blue'] { --accent: #6C8CFF; --accent-2: #4FC3E0; --accent-soft: rgba(108, 140, 255, 0.14); }
+:root[data-accent='neutral'] { --accent: #AEB8C6; --accent-2: #7D8796; --accent-soft: rgba(174, 184, 198, 0.12); --accent-ink: #0B0D10; }
+:root[data-accent='ember'] { --accent: #F0893A; --accent-2: #E0B04F; --accent-soft: rgba(240, 137, 58, 0.14); --accent-ink: #1A0B00; --glow: 0 0 26px rgba(240, 137, 58, 0.28); }
+:root[data-theme='light'][data-accent='blue'] { --accent: #3554D1; --accent-2: #0E7C93; }
+:root[data-theme='light'][data-accent='ember'] { --accent: #B85A12; --accent-2: #8A5A00; --accent-ink: #FFFFFF; }
+:root[data-theme='light'][data-accent='neutral'] { --accent: #4B5563; --accent-2: #6B7280; --accent-ink: #FFFFFF; }
 
-:root[data-density='compact'] { --space-3: 8px; --space-4: 12px; --space-5: 16px; }
-
-:root[data-motion='reduced'] * { transition: none !important; animation: none !important; }
+:root[data-density='compact'] { --sp-3: 8px; --sp-4: 12px; --sp-5: 16px; }
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after { animation: none !important; transition: none !important; }

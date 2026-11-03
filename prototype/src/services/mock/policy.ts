@@ -1,7 +1,7 @@
 import { Store } from '../store';
 import type { DiagnosticsService, PolicyService, PolicyState } from '../contracts';
 import type { PolicyLimits } from '../../types/contracts';
-import { seedAudit, seedRules } from '../../data/seed';
+import { seedAudit, seedRules, seedTrusts } from '../../data/seed';
 import { nextId, nowIso } from './ids';
 
 export const DEFAULT_LIMITS: PolicyLimits = {
@@ -21,7 +21,7 @@ const LIMIT_BOUNDS: Record<keyof PolicyLimits, [number, number]> = {
 };
 
 export function createPolicyService(diag: DiagnosticsService): PolicyService {
-  const store = new Store<PolicyState>({ rules: seedRules, limits: DEFAULT_LIMITS, audit: seedAudit });
+  const store = new Store<PolicyState>({ rules: seedRules, limits: DEFAULT_LIMITS, audit: seedAudit, trusts: seedTrusts });
 
   const setAutonomy: PolicyService['setAutonomy'] = (ruleId, autonomy) => {
     const rule = store.get().rules.find((r) => r.id === ruleId);
@@ -43,5 +43,25 @@ export function createPolicyService(diag: DiagnosticsService): PolicyService {
     store.set((s) => ({ ...s, limits: { ...s.limits, [key]: clamped } }));
   };
 
-  return { get: store.get, subscribe: store.subscribe, setAutonomy, setLimit };
+  const grantTrust: PolicyService['grantTrust'] = (scope, days) => {
+    const now = Date.now();
+    const grant = { id: nextId('tr'), scope, grantedAt: new Date(now).toISOString(), expiresAt: new Date(now + days * 86_400_000).toISOString() };
+    store.set((s) => ({
+      ...s,
+      trusts: [...s.trusts, grant],
+      audit: [{ id: nextId('au'), at: nowIso(), kind: 'trust.granted', summary: `${scope} trusted for ${days} days`, decision: 'owner grant (simulated)' }, ...s.audit].slice(0, 50),
+    }));
+  };
+
+  const revokeTrust: PolicyService['revokeTrust'] = (id) => {
+    const grant = store.get().trusts.find((t) => t.id === id);
+    if (!grant) return;
+    store.set((s) => ({
+      ...s,
+      trusts: s.trusts.filter((t) => t.id !== id),
+      audit: [{ id: nextId('au'), at: nowIso(), kind: 'trust.revoked', summary: `${grant.scope} trust revoked`, decision: 'owner revoke' }, ...s.audit].slice(0, 50),
+    }));
+  };
+
+  return { get: store.get, subscribe: store.subscribe, setAutonomy, setLimit, grantTrust, revokeTrust };
 }

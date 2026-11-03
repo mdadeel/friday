@@ -11,17 +11,17 @@ const LEVEL_MS = 110;
  * Endpointing, barge-in and echo handling are represented as state transitions only.
  */
 export function createVoiceService(deps: { diag: DiagnosticsService; onFinal: (text: string) => void }): VoiceService {
-  const initial: VoiceSnapshot = {
+  const store = new Store<VoiceSnapshot>({
     state: 'Idle',
     partial: '',
+    finalText: '',
     level: 0,
     device: 'Default input — not opened (prototype)',
     engine: 'whisper_local',
     cloudConsent: false,
     micOpen: false,
     simulated: true,
-  };
-  const store = new Store<VoiceSnapshot>(initial);
+  });
   let timers: ReturnType<typeof setTimeout>[] = [];
   let levelHandle: ReturnType<typeof setInterval> | null = null;
   let wordHandle: ReturnType<typeof setInterval> | null = null;
@@ -43,7 +43,7 @@ export function createVoiceService(deps: { diag: DiagnosticsService; onFinal: (t
     levelHandle = null;
     wordHandle = null;
     const text = store.get().partial.trim() || DEMO_SPEECH;
-    patch({ state: 'Finalising', micOpen: false, level: 0, partial: text });
+    patch({ state: 'Finalising', micOpen: false, level: 0, partial: text, finalText: text });
     timers.push(
       setTimeout(() => {
         patch({ state: 'Dispatching' });
@@ -54,7 +54,15 @@ export function createVoiceService(deps: { diag: DiagnosticsService; onFinal: (t
     );
   };
 
-  const pressToTalk = (): void => {
+  const bargeIn = (): void => {
+    if (store.get().state !== 'Speaking') return;
+    clearAll();
+    patch({ state: 'Interrupted' });
+    deps.diag.log('voice', 'warn', 'barge-in: playback stopped (simulated)');
+    timers.push(setTimeout(() => pressToTalk(), 120));
+  };
+
+  function pressToTalk(): void {
     const s = store.get().state;
     if (s === 'Listening') return;
     if (s === 'Speaking') {
@@ -62,7 +70,7 @@ export function createVoiceService(deps: { diag: DiagnosticsService; onFinal: (t
       return;
     }
     clearAll();
-    patch({ state: 'Listening', micOpen: true, partial: '', level: 0.2 });
+    patch({ state: 'Listening', micOpen: true, partial: '', finalText: '', level: 0.2 });
     deps.diag.log('voice', 'info', 'push-to-talk: listening (simulated, no microphone opened)');
     let i = 0;
     const words = DEMO_SPEECH.split(' ');
@@ -79,21 +87,13 @@ export function createVoiceService(deps: { diag: DiagnosticsService; onFinal: (t
       phase += 1;
       patch({ level: 0.25 + 0.6 * Math.abs(Math.sin(phase / 2)) });
     }, LEVEL_MS);
-    // Auto-finalise after the canned phrase plus endpoint silence (700 ms, as a hypothesis in the spec).
+    // Auto-finalise after the canned phrase plus endpoint silence (700 ms, a hypothesis in the spec).
     timers.push(setTimeout(() => store.get().state === 'Listening' && finalise(), words.length * WORD_MS + 700));
-  };
+  }
 
   const release = (): void => {
     if (store.get().state === 'Listening') finalise();
   };
-
-  function bargeIn(): void {
-    if (store.get().state !== 'Speaking') return;
-    clearAll();
-    patch({ state: 'Interrupted' });
-    deps.diag.log('voice', 'warn', 'barge-in: playback stopped (simulated)');
-    timers.push(setTimeout(() => pressToTalk(), 120));
-  }
 
   const speak = (text: string): void => {
     clearAll();
@@ -116,13 +116,5 @@ export function createVoiceService(deps: { diag: DiagnosticsService; onFinal: (t
     deps.diag.log('voice', 'info', `engine set to ${engine} (simulated)`);
   };
 
-  return {
-    get: store.get,
-    subscribe: store.subscribe,
-    pressToTalk,
-    release,
-    bargeIn,
-    setEngine,
-    speak,
-  };
+  return { get: store.get, subscribe: store.subscribe, pressToTalk, release, bargeIn, setEngine, speak };
 }

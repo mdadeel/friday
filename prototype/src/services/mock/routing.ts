@@ -1,44 +1,50 @@
 import { Store } from '../store';
 import type { DiagnosticsService, RoutingService } from '../contracts';
 import type { ProviderInfo, RouteInfo, RoutingState, Tier } from '../../types/contracts';
-import { seedCategories, seedProviders, seedRecentRoutes, seedRoutingEvents, seedTiers } from '../../data/seed';
-import { classifyIntent, buildRoute } from './logic';
+import { seedCategories, seedModels, seedProviders, seedRecentRoutes, seedRoutingEvents, seedTiers } from '../../data/seed';
+import { classifyIntent, buildRoute, routeRuleFor } from './logic';
 import { nextId, nowIso } from './ids';
 
-/** Probe outcomes are fixed so the prototype is repeatable. They are simulated, not measured. */
-const PROBE_RESULT: Record<string, ProviderInfo['health']> = {
-  native: 'up',
-  ollama: 'up',
-  llama_cpp: 'down',
-  cloud_llm: 'not_configured',
-  gemini_live: 'not_configured',
-  searxng: 'up',
-};
+/**
+ * A probe never contacts a provider. The prototype has no provider client, so every probe reports
+ * 'unknown' with the reason. Built-in utilities run in the browser, so they are 'up' by construction.
+ */
+function probeOutcome(p: ProviderInfo): { health: ProviderInfo['health']; reason: string } {
+  if (p.kind === 'native') return { health: 'up', reason: 'Runs in this browser tab (Tier 0).' };
+  if (p.health === 'not_configured') return { health: 'not_configured', reason: p.reason };
+  return { health: 'unknown', reason: 'Not probed: no provider client in the prototype. Nothing was contacted.' };
+}
 
 export function createRoutingService(diag: DiagnosticsService): RoutingService {
-  const initial: RoutingState = {
+  const store = new Store<RoutingState>({
     providers: seedProviders,
+    models: seedModels,
     tiers: seedTiers,
     categories: seedCategories,
     recent: seedRecentRoutes,
     events: seedRoutingEvents,
-    requests24h: 128,
-    noModelShare: 0.31,
-    medianFirstTokenMs: 740,
-    fallbacks24h: 6,
+    sessionRequests: 0,
+    browserAnswered: 0,
+    modelCalls: 0,
+    fallbacks: 0,
     simulated: true,
-  };
-  const store = new Store<RoutingState>(initial);
+  });
+
+  const addEvent = (s: RoutingState, text: string, severity: 'info' | 'warn' | 'error', kind: RoutingState['events'][number]['kind']): RoutingState['events'] =>
+    [{ id: nextId('ev'), at: nowIso(), severity, kind, text }, ...s.events].slice(0, 30);
 
   const record = (route: RouteInfo): void => {
     store.set((s) => ({
       ...s,
       recent: [route, ...s.recent].slice(0, 25),
-      requests24h: s.requests24h + 1,
-      fallbacks24h: route.outcome === 'fallback' ? s.fallbacks24h + 1 : s.fallbacks24h,
+      sessionRequests: s.sessionRequests + 1,
+      browserAnswered: route.executedBy === 'browser' ? s.browserAnswered + 1 : s.browserAnswered,
+      modelCalls: s.modelCalls, // no provider client exists, so no model call is ever made
+      fallbacks: route.outcome === 'fallback' ? s.fallbacks + 1 : s.fallbacks,
+      categories: s.categories.map((c) => (c.category === route.category ? { ...c, route: `${route.tier} · ${route.provider}`, calls: c.calls + 1 } : c)),
       events:
         route.outcome === 'fallback'
-          ? [{ id: nextId('ev'), at: nowIso(), severity: 'warn' as const, text: `Fallback used for ${route.category ?? 'request'} (simulated).` }, ...s.events].slice(0, 20)
+          ? addEvent(s, `Fallback recorded for ${route.category}.`, 'warn', 'fallback')
           : s.events,
     }));
   };
@@ -47,28 +53,37 @@ export function createRoutingService(diag: DiagnosticsService): RoutingService {
     store.set((s) => ({
       ...s,
       tiers: s.tiers.map((t) => (t.tier === tier ? { ...t, provider: patch.provider ?? t.provider, model: patch.model ?? t.model } : t)),
-      events: [{ id: nextId('ev'), at: nowIso(), severity: 'info' as const, text: `${tier} route changed in prototype (not persisted).` }, ...s.events].slice(0, 20),
+      events: addEvent(s, `${tier} route changed in this session (not saved).`, 'info', 'route_change'),
     }));
-    diag.log('router', 'info', `${tier} route changed (simulated)`);
+    diag.log('router', 'info', `${tier} route changed (session only)`);
+  };
+
+  const setFallbacks = (tier: Tier, fallbacks: string[]): void => {
+    store.set((s) => ({
+      ...s,
+      tiers: s.tiers.map((t) => (t.tier === tier ? { ...t, fallbacks } : t)),
+      events: addEvent(s, `${tier} fallback order changed (session only).`, 'info', 'route_change'),
+    }));
   };
 
   const probe = (providerId: string): void => {
-    store.set((s) => ({ ...s, providers: s.providers.map((p) => (p.id === providerId ? { ...p, health: 'probing' as const } : p)) }));
-    setTimeout(() => {
-      store.set((s) => ({
-        ...s,
-        providers: s.providers.map((p) =>
-          p.id === providerId ? { ...p, health: PROBE_RESULT[providerId] ?? 'down', lastProbe: nowIso() } : p,
-        ),
-      }));
-      diag.log('models', 'info', `probe ${providerId}: ${PROBE_RESULT[providerId] ?? 'down'} (simulated)`);
-    }, 900);
+    const p = store.get().providers.find((x) => x.id === providerId);
+    if (!p) return;
+    const out = probeOutcome(p);
+    store.set((s) => ({
+      ...s,
+      providers: s.providers.map((x) => (x.id === providerId ? { ...x, health: out.health, reason: out.reason, lastProbe: nowIso() } : x)),
+      events: addEvent(s, `Probe ${p.name}: ${out.health}. ${out.reason}`, out.health === 'up' ? 'info' : 'warn', 'probe'),
+    }));
+    diag.log('models', 'info', `probe ${providerId}: ${out.health}`);
   };
 
   const testRoute = (text: string): RouteInfo | null => {
     if (!text.trim()) return null;
-    return buildRoute('preview', nowIso(), classifyIntent(text), 0);
+    const intent = classifyIntent(text);
+    if (!routeRuleFor(intent)) return null;
+    return buildRoute('preview', nowIso(), intent);
   };
 
-  return { get: store.get, subscribe: store.subscribe, record, setTier, probe, testRoute };
+  return { get: store.get, subscribe: store.subscribe, record, setTier, setFallbacks, probe, testRoute };
 }

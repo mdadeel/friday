@@ -1,6 +1,6 @@
-// Typed DTOs for the EDITH local API. These mirror docs/edith/EDITH_API_AND_EVENT_CONTRACTS.md.
+// Typed DTOs for the EDITH local API. They mirror docs/edith/EDITH_API_AND_EVENT_CONTRACTS.md.
 // In the prototype they are produced by mock services. Every object that originates from
-// simulation carries `simulated: true` so that UI can label it.
+// simulation carries `simulated: true` so the UI can label it.
 
 export type TaskState =
   | 'Idle' | 'Understanding' | 'ContextRetrieval' | 'Planning' | 'Routing' | 'Executing'
@@ -8,6 +8,7 @@ export type TaskState =
 
 export type Tier = 'T0' | 'T1' | 'T2' | 'T3' | 'T4';
 export type DataClass = 'Public' | 'Personal' | 'Project' | 'Secret';
+export type Locality = 'Local' | 'Cloud';
 export type Provenance = 'explicit' | 'inferred' | 'temporary' | 'assumption' | 'outdated';
 export type MemoryCategory = 'episodic' | 'semantic' | 'procedural' | 'working';
 export type MemoryStatus = 'active' | 'pending_review' | 'superseded' | 'expired' | 'deleted';
@@ -16,6 +17,7 @@ export type AutonomyClass = 'automatic' | 'policy_controlled' | 'confirm_require
 export type VerificationMode = 'mechanical' | 'evidence' | 'user_confirmed' | 'none_declared';
 export type SideEffect = 'none' | 'read' | 'write' | 'network' | 'process' | 'system';
 export type TaskIntent = 'time' | 'date' | 'calc' | 'personal' | 'research' | 'code' | 'continue' | 'chat';
+export type ChatMode = 'auto' | 'research' | 'code';
 
 export interface RouteInfo {
   id: string;
@@ -24,39 +26,51 @@ export interface RouteInfo {
   provider: string;
   model: string | null;
   dataClass: DataClass;
+  locality: Locality;
   reason: string;
   fallbacks: string[];
-  latencyMs: number;
   category: string;
   outcome: 'ok' | 'fallback' | 'failed';
-  simulated?: boolean;
+  /** 'browser' only for Tier 0 utilities. Model routes are decisions: no model is called. */
+  executedBy: 'browser' | 'none';
+  simulated: true;
 }
 
+/** A source from the fixed reference list. `checkedOn` is when a person opened the page; it is not a publication date. */
 export interface EvidenceSource {
   id: string;
   title: string;
   url: string;
   authorityTier: 1 | 2 | 3;
-  date: string;
-  spans: number;
-  simulated?: boolean;
+  checkedOn: string;
+  claim: string;
+  simulated: true;
+}
+
+/** How the work is organised: no orchestration, a deterministic utility, or a dependency graph of steps. */
+export interface Orchestration {
+  pattern: 'direct' | 'deterministic' | 'dag';
+  steps: number;
+  maxParallel: number;
+  approvalGates: number;
+  reason: string;
 }
 
 export interface ChatMessage {
   id: string;
   role: 'owner' | 'edith' | 'system';
-  kind: 'text' | 'task' | 'approval' | 'notice';
+  kind: 'text' | 'task' | 'notice' | 'evidence';
   text: string;
   at: string;
   source: 'text' | 'voice';
   route?: RouteInfo;
   taskId?: string;
-  approvalId?: string;
+  linkedTaskId?: string;
   streaming?: boolean;
-  thinking?: string;
-  toolCalls?: Array<{ name: string; input?: any; output?: any; status: 'running' | 'completed' | 'failed' }>;
+  mode?: ChatMode;
+  contextAttached?: boolean;
   sources?: EvidenceSource[];
-  simulated?: boolean;
+  simulated?: true;
 }
 
 export interface TaskEvent {
@@ -66,15 +80,46 @@ export interface TaskEvent {
   text: string;
 }
 
+export interface ToolCall {
+  id: string;
+  stepId: string;
+  name: string;
+  argsSummary: string;
+  status: 'running' | 'ok' | 'error';
+  startedAt: string;
+  durationMs?: number;
+  simulated: true;
+}
+
+export interface TaskError {
+  id: string;
+  at: string;
+  message: string;
+  recovery: string;
+}
+
+export interface ChangedFile {
+  path: string;
+  added: number;
+  removed: number;
+  status: 'proposed' | 'applied' | 'denied';
+  rollbackAvailable: boolean;
+}
+
 export interface TaskSubtask {
   id: string;
   label: string;
   capability: string;
+  kind: 'tool' | 'model';
   deps: string[];
   state: 'pending' | 'running' | 'done' | 'failed' | 'skipped';
   tier: Tier;
   needsApproval?: boolean;
+  failOnce?: boolean;
+  attempts: number;
   remainingTicks: number;
+  startedAt?: string;
+  finishedAt?: string;
   note?: string;
 }
 
@@ -96,10 +141,16 @@ export interface TaskRecord {
   subtasks: TaskSubtask[];
   events: TaskEvent[];
   verdicts: Verdict[];
+  tools: ToolCall[];
+  errors: TaskError[];
+  evidence: EvidenceSource[];
+  changedFiles: ChangedFile[];
+  unresolved: string[];
   route?: RouteInfo;
+  orchestration: Orchestration;
   outcome?: 'completed' | 'failed' | 'cancelled';
   blocker?: string;
-  simulated?: boolean;
+  simulated: true;
 }
 
 export interface ApprovalRequest {
@@ -110,6 +161,14 @@ export interface ApprovalRequest {
   preview: string;
   autonomy: AutonomyClass;
   status: 'pending' | 'approved' | 'denied';
+  scope?: 'once' | 'task' | 'project';
+  decidedAt?: string;
+}
+
+export interface MemoryVersion {
+  version: number;
+  content: string;
+  at: string;
 }
 
 export interface MemoryItem {
@@ -122,11 +181,13 @@ export interface MemoryItem {
   userConfirmed: boolean;
   status: MemoryStatus;
   sources: string[];
+  related: string[];
+  history: MemoryVersion[];
   createdAt: string;
   updatedAt: string;
   version: number;
   conflictsWith?: string;
-  simulated?: boolean;
+  simulated: true;
 }
 
 export interface McpTool {
@@ -158,8 +219,10 @@ export interface McpServer {
   reason?: string;
   enabled: boolean;
   tools: McpTool[];
+  resources: string[];
+  prompts: string[];
   history: CapabilityCall[];
-  simulated?: boolean;
+  simulated: true;
 }
 
 export interface Skill {
@@ -173,10 +236,11 @@ export interface Skill {
   hashStatus: 'approved' | 'changed';
   requires: string[];
   compatibility: string;
-  simulated?: boolean;
+  simulated: true;
 }
 
-export type ProviderHealth = 'up' | 'degraded' | 'down' | 'not_configured' | 'probing';
+/** 'unknown' means not probed. The prototype never claims a provider is up without a real check. */
+export type ProviderHealth = 'up' | 'degraded' | 'down' | 'not_configured' | 'probing' | 'unknown';
 
 export interface ProviderInfo {
   id: string;
@@ -184,10 +248,27 @@ export interface ProviderInfo {
   kind: 'local_server' | 'cloud' | 'native' | 'speech' | 'search';
   endpoint: string;
   health: ProviderHealth;
-  lastProbe: string;
+  /** Why the health value is what it is, for example "Not probed". */
+  reason: string;
+  lastProbe?: string;
   consent: DataClass[];
   models: string[];
-  simulated?: boolean;
+  simulated: true;
+}
+
+/** A model from the published catalogue. `status` is always 'not_checked' in the prototype: nothing is installed or probed. */
+export interface LocalModel {
+  id: string;
+  provider: string;
+  /** Ollama tag, for example qwen3:8b. */
+  name: string;
+  sizeLabel: string;
+  context: string;
+  capabilities: string[];
+  source: string;
+  checkedOn: string;
+  status: 'not_checked';
+  simulated: true;
 }
 
 export interface TierConfig {
@@ -201,28 +282,31 @@ export interface TierConfig {
 export interface CategoryStat {
   category: string;
   route: string;
-  successRate: number;
-  medianMs: number;
+  /** Count of routes recorded in this browser session. */
+  calls: number;
 }
 
 export interface RoutingEvent {
   id: string;
   at: string;
   severity: 'info' | 'warn' | 'error';
+  kind: 'fallback' | 'degraded' | 'route_change' | 'probe';
   text: string;
 }
 
 export interface RoutingState {
   providers: ProviderInfo[];
+  models: LocalModel[];
   tiers: TierConfig[];
-  recent: RouteInfo[];
   categories: CategoryStat[];
+  recent: RouteInfo[];
   events: RoutingEvent[];
-  requests24h: number;
-  noModelShare: number;
-  medianFirstTokenMs: number;
-  fallbacks24h: number;
-  simulated?: boolean;
+  /** Counts from this browser session only. Nothing is measured over 24 hours. */
+  sessionRequests: number;
+  browserAnswered: number;
+  modelCalls: number;
+  fallbacks: number;
+  simulated: true;
 }
 
 export interface PolicyRule {
@@ -251,15 +335,23 @@ export interface PolicyLimits {
   budgetMinutes: number;
 }
 
+export interface TrustGrant {
+  id: string;
+  scope: string;
+  grantedAt: string;
+  expiresAt: string;
+}
+
 export interface VoiceSnapshot {
   state: 'Off' | 'Idle' | 'Listening' | 'Transcribing' | 'Finalising' | 'Dispatching' | 'Thinking' | 'Speaking' | 'Interrupted';
   partial: string;
+  finalText: string;
   level: number;
   device: string;
   engine: 'whisper_local' | 'gemini_live_cloud';
   cloudConsent: boolean;
   micOpen: boolean;
-  simulated?: boolean;
+  simulated: true;
 }
 
 export interface SearchResult {
@@ -268,7 +360,7 @@ export interface SearchResult {
   provider: string;
   authorityTier: 1 | 2 | 3;
   snippet: string;
-  simulated?: boolean;
+  simulated: true;
 }
 
 export interface LogEntry {
@@ -278,4 +370,12 @@ export interface LogEntry {
   subsystem: string;
   message: string;
   traceId: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  at: string;
+  severity: 'info' | 'ok' | 'warn' | 'error';
+  text: string;
+  taskId?: string;
 }

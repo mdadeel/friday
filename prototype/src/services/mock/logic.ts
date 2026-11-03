@@ -4,6 +4,7 @@
 
 import type {
   MemoryItem,
+  Orchestration,
   RouteInfo,
   TaskIntent,
   Tier,
@@ -11,6 +12,13 @@ import type {
 } from '../../types/contracts';
 
 export const DISPLAY_TZ = 'Asia/Dhaka';
+
+/** Default tier tags, taken from the published qwen3 catalogue. Candidates until gate G1 closes. Kept here so this module has no runtime imports. */
+export const DEFAULT_TIER_MODELS = {
+  T1: 'qwen3:1.7b',
+  T2: 'qwen3:8b',
+  T3: 'qwen3:32b',
+} as const;
 
 /** Deterministic Tier 0 matcher. Returns null when a model would be needed. */
 export function tier0Match(text: string): { intent: 'time' | 'date' | 'calc'; expr?: string } | null {
@@ -181,7 +189,7 @@ export function routeRuleFor(intent: TaskIntent): RouteRule {
       return {
         tier: 'T2',
         provider: 'ollama',
-        model: 'qwen3 · 8B (candidate)',
+        model: DEFAULT_TIER_MODELS.T2,
         fallbacks: ['llama_cpp'],
         reason: 'Memory-grounded answer; explicit facts only',
         category: 'Personal memory',
@@ -190,7 +198,7 @@ export function routeRuleFor(intent: TaskIntent): RouteRule {
       return {
         tier: 'T3',
         provider: 'ollama',
-        model: 'qwen3 · 32B (candidate)',
+        model: DEFAULT_TIER_MODELS.T3,
         fallbacks: ['llama_cpp', 'T2 local model'],
         reason: 'Multi-step research; deep reasoning; evidence verification',
         category: 'Research',
@@ -199,7 +207,7 @@ export function routeRuleFor(intent: TaskIntent): RouteRule {
       return {
         tier: 'T3',
         provider: 'ollama',
-        model: 'qwen3 · 32B (candidate)',
+        model: DEFAULT_TIER_MODELS.T3,
         fallbacks: ['llama_cpp', 'T2 local model'],
         reason: 'Multi-step coding task; mechanical verification required',
         category: 'Coding',
@@ -208,7 +216,7 @@ export function routeRuleFor(intent: TaskIntent): RouteRule {
       return {
         tier: 'T2',
         provider: 'ollama',
-        model: 'qwen3 · 8B (candidate)',
+        model: DEFAULT_TIER_MODELS.T2,
         fallbacks: ['llama_cpp'],
         reason: 'Episodic retrieval and summary',
         category: 'Continuation',
@@ -218,7 +226,7 @@ export function routeRuleFor(intent: TaskIntent): RouteRule {
       return {
         tier: 'T2',
         provider: 'ollama',
-        model: 'qwen3 · 8B (candidate)',
+        model: DEFAULT_TIER_MODELS.T2,
         fallbacks: ['llama_cpp'],
         reason: 'Standard conversation',
         category: 'Conversation',
@@ -226,7 +234,12 @@ export function routeRuleFor(intent: TaskIntent): RouteRule {
   }
 }
 
-export function buildRoute(id: string, at: string, intent: TaskIntent, latencyMs: number): RouteInfo {
+/** Local providers keep data on this machine; cloud providers send it out. */
+export function localityOf(provider: string): 'Local' | 'Cloud' {
+  return provider === 'cloud_llm' || provider === 'gemini_live' ? 'Cloud' : 'Local';
+}
+
+export function buildRoute(id: string, at: string, intent: TaskIntent): RouteInfo {
   const rule = routeRuleFor(intent);
   return {
     id,
@@ -235,11 +248,12 @@ export function buildRoute(id: string, at: string, intent: TaskIntent, latencyMs
     provider: rule.provider,
     model: rule.model,
     dataClass: 'Personal',
+    locality: localityOf(rule.provider),
     reason: rule.reason,
     fallbacks: rule.fallbacks,
-    latencyMs,
     category: rule.category,
     outcome: 'ok',
+    executedBy: rule.provider === 'native' ? 'browser' : 'none',
     simulated: true,
   };
 }
@@ -247,9 +261,11 @@ export function buildRoute(id: string, at: string, intent: TaskIntent, latencyMs
 export interface PlanSeed {
   label: string;
   capability: string;
+  kind: 'tool' | 'model';
   deps: number[]; // indexes into the same list
   tier: Tier;
   needsApproval?: boolean;
+  failOnce?: boolean;
   ticks: number;
 }
 
@@ -265,49 +281,82 @@ export function planFor(intent: TaskIntent): PlanTemplate {
     case 'research':
       return {
         verification: 'evidence',
-        criteria: ['Every claim maps to a retrieved source span', 'Alternatives compared with stated criteria'],
+        criteria: ['Target, not enforced here: every claim maps to a source', 'Alternatives compared with stated criteria'],
         subtasks: [
-          { label: 'Retrieve project memory', capability: 'native:memory.search', deps: [], tier: 'T0', ticks: 2 },
-          { label: 'Search: official SDK documentation', capability: 'native:search.web', deps: [], tier: 'T4', ticks: 3 },
-          { label: 'Search: alternatives and benchmarks', capability: 'native:search.web', deps: [], tier: 'T4', ticks: 3 },
-          { label: 'Read top sources', capability: 'native:fetch.url', deps: [1, 2], tier: 'T4', ticks: 3 },
-          { label: 'Compare alternatives', capability: 'model:reasoning', deps: [0, 3], tier: 'T3', ticks: 4 },
-          { label: 'Draft recommendation', capability: 'model:reasoning', deps: [4], tier: 'T3', ticks: 3 },
-          { label: 'Verify claims against evidence', capability: 'model:verifier', deps: [5], tier: 'T2', ticks: 2 },
-          { label: 'Propose memory updates', capability: 'native:memory.propose', deps: [6], tier: 'T1', ticks: 1 },
+          { label: 'Retrieve project memory', kind: 'tool', capability: 'native:memory.search', deps: [], tier: 'T0', ticks: 2 },
+          { label: 'Search: official SDK documentation', kind: 'tool', capability: 'native:search.web', deps: [], tier: 'T4', ticks: 3 },
+          { label: 'Search: alternatives and benchmarks', kind: 'tool', capability: 'native:search.web', deps: [], tier: 'T4', ticks: 3, failOnce: true },
+          { label: 'Read top sources', kind: 'tool', capability: 'native:fetch.url', deps: [1, 2], tier: 'T4', ticks: 3 },
+          { label: 'Compare alternatives', kind: 'model', capability: 'model:reasoning', deps: [0, 3], tier: 'T3', ticks: 4 },
+          { label: 'Draft recommendation', kind: 'model', capability: 'model:reasoning', deps: [4], tier: 'T3', ticks: 3 },
+          { label: 'Verify claims against evidence', kind: 'model', capability: 'model:verifier', deps: [5], tier: 'T2', ticks: 2 },
+          { label: 'Propose memory updates', kind: 'tool', capability: 'native:memory.propose', deps: [6], tier: 'T1', ticks: 1 },
         ],
       };
     case 'code':
       return {
         verification: 'mechanical',
-        criteria: ['Test suite passes after the patch', 'Changed files stay within the approved limit'],
+        criteria: ['Target, not enforced here: test suite passes after the patch', 'Target: changed files stay within the approved limit'],
         subtasks: [
-          { label: 'Locate authentication code', capability: 'native:fs.read', deps: [], tier: 'T2', ticks: 2 },
-          { label: 'Reproduce failing test', capability: 'native:process.run_template', deps: [0], tier: 'T0', ticks: 2 },
-          { label: 'Propose patch', capability: 'model:reasoning', deps: [1], tier: 'T3', ticks: 4 },
-          { label: 'Apply patch to project files', capability: 'native:fs.write', deps: [2], tier: 'T0', ticks: 2, needsApproval: true },
-          { label: 'Run project tests', capability: 'native:process.run_template', deps: [3], tier: 'T0', ticks: 3 },
-          { label: 'Verify test result', capability: 'model:verifier', deps: [4], tier: 'T2', ticks: 1 },
+          { label: 'Locate authentication code', kind: 'tool', capability: 'native:fs.read', deps: [], tier: 'T2', ticks: 2 },
+          { label: 'Reproduce failing test', kind: 'tool', capability: 'native:process.run_template', deps: [0], tier: 'T0', ticks: 2 },
+          { label: 'Propose patch', kind: 'model', capability: 'model:reasoning', deps: [1], tier: 'T3', ticks: 4 },
+          { label: 'Apply patch to project files', kind: 'tool', capability: 'native:fs.write', deps: [2], tier: 'T0', ticks: 2, needsApproval: true },
+          { label: 'Run project tests', kind: 'tool', capability: 'native:process.run_template', deps: [3], tier: 'T0', ticks: 3 },
+          { label: 'Verify test result', kind: 'model', capability: 'model:verifier', deps: [4], tier: 'T2', ticks: 1 },
         ],
       };
     case 'continue':
       return {
         verification: 'evidence',
-        criteria: ['Stopping point identified from stored evidence', 'Discrepancies reported'],
+        criteria: ['Target, not enforced here: stopping point identified from stored evidence', 'Target: discrepancies reported'],
         subtasks: [
-          { label: 'Retrieve episodic memory', capability: 'native:memory.search', deps: [], tier: 'T0', ticks: 2 },
-          { label: 'Check project state (git status)', capability: 'native:git.status', deps: [], tier: 'T0', ticks: 2 },
-          { label: 'Identify stopping point', capability: 'model:reasoning', deps: [0, 1], tier: 'T2', ticks: 2 },
-          { label: 'Resume plan', capability: 'model:reasoning', deps: [2], tier: 'T2', ticks: 2 },
+          { label: 'Retrieve episodic memory', kind: 'tool', capability: 'native:memory.search', deps: [], tier: 'T0', ticks: 2 },
+          { label: 'Check project state (git status)', kind: 'tool', capability: 'native:git.status', deps: [], tier: 'T0', ticks: 2 },
+          { label: 'Identify stopping point', kind: 'model', capability: 'model:reasoning', deps: [0, 1], tier: 'T2', ticks: 2 },
+          { label: 'Resume plan', kind: 'model', capability: 'model:reasoning', deps: [2], tier: 'T2', ticks: 2 },
         ],
       };
     default:
       return {
         verification: 'none_declared',
         criteria: [],
-        subtasks: [{ label: 'Answer', capability: 'model:chat', deps: [], tier: 'T2', ticks: 2 }],
+        subtasks: [{ label: 'Answer', kind: 'model', capability: 'model:chat', deps: [], tier: 'T2', ticks: 2 }],
       };
   }
+}
+
+/**
+ * Orchestration is derived from the plan, never assumed:
+ * - deterministic: Tier 0 utility, one browser step;
+ * - direct: a single answer step, no graph;
+ * - dag: several steps; maxParallel is the widest level of the dependency graph, approvalGates counts steps that wait for a person.
+ */
+export function orchestrationOf(intent: TaskIntent, plan: PlanTemplate): Orchestration {
+  const n = plan.subtasks.length;
+  const gates = plan.subtasks.filter((t) => t.needsApproval).length;
+  if (intent === 'time' || intent === 'date' || intent === 'calc') {
+    return { pattern: 'deterministic', steps: 1, maxParallel: 1, approvalGates: 0, reason: 'Answered by a Tier 0 utility in the browser. No orchestration is needed.' };
+  }
+  if (n <= 1) {
+    return { pattern: 'direct', steps: n, maxParallel: 1, approvalGates: gates, reason: 'One answer step. No multi-step plan is needed.' };
+  }
+  // Dependencies point to earlier indexes, so one forward pass gives each step's level.
+  const level: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const deps = plan.subtasks[i].deps;
+    level[i] = deps.length ? 1 + Math.max(...deps.map((d) => level[d])) : 0;
+  }
+  const width = new Map<number, number>();
+  for (const l of level) width.set(l, (width.get(l) ?? 0) + 1);
+  const maxParallel = Math.max(...width.values());
+  return {
+    pattern: 'dag',
+    steps: n,
+    maxParallel,
+    approvalGates: gates,
+    reason: `${n} steps in ${width.size} levels with dependencies. Up to ${maxParallel} may run at once.`,
+  };
 }
 
 export function verificationLabel(mode: VerificationMode): string {

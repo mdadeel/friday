@@ -1,6 +1,6 @@
 export type Listener = () => void;
 
-/** Minimal observable store, compatible with React's useSyncExternalStore. */
+/** Minimal observable store, compatible with React's useSyncExternalStore. Snapshots are stable until set. */
 export class Store<T> {
   private value: T;
   private listeners = new Set<Listener>();

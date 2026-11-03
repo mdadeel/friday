@@ -1,29 +1,21 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { createMockServices } from './services/mock';
-import { createAutoDetectServices } from './services/daemon';
 import { ServicesProvider } from './app/services';
-import type { Services } from './services/contracts';
 import './styles/tokens.css';
-import './styles/app.css';
+import './styles/base.css';
+import './styles/layout.css';
+import './styles/components.css';
+import './styles/screens.css';
 
-function Root() {
-  const [services, setServices] = useState<Services>(() => createMockServices());
+// Every service is simulated. To connect a real daemon, supply a different Services object here.
+const services = createMockServices();
 
-  useEffect(() => {
-    createAutoDetectServices().then((detected) => {
-      setServices(detected);
-    });
-  }, []);
-
-  return (
-    <StrictMode>
-      <ServicesProvider services={services}>
-        <App />
-      </ServicesProvider>
-    </StrictMode>
-  );
-}
-
-createRoot(document.getElementById('root')!).render(<Root />);
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ServicesProvider services={services}>
+      <App />
+    </ServicesProvider>
+  </StrictMode>,
+);

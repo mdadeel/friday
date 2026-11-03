@@ -1,32 +1,27 @@
-import { useEffect } from 'react';
-import { PromptKitShell } from './components/PromptKitShell';
+import { useEffect, useState } from 'react';
 import { useRoute } from './app/router';
 import { useObservable, useServices } from './app/services';
-import { PromptKitConversation } from './screens/PromptKitConversation';
-import { OverlayScreen } from './screens/Overlay';
-import { ActivityScreen } from './screens/Activity';
-import { MemoryScreen } from './screens/Memory';
-import { CapabilitiesScreen } from './screens/Capabilities';
-import { RoutingScreen } from './screens/Routing';
-import { SettingsScreen } from './screens/Settings';
+import { useAppearance } from './app/useAppearance';
+import { AppShell } from './components/AppShell';
+import { ConversationScreen } from './screens/ConversationScreen';
+import { ActivityScreen } from './screens/ActivityScreen';
+import { MemoryScreen } from './screens/MemoryScreen';
+import { CapabilitiesScreen } from './screens/CapabilitiesScreen';
+import { RoutingScreen } from './screens/RoutingScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
+import { OverlayScreen } from './screens/OverlayScreen';
 
+/** Root: applies appearance settings, then renders the screen for the current hash route. */
 export default function App() {
   const route = useRoute();
-  const s = useServices();
-  const settings = useObservable(s.settings);
+  const { settings } = useServices();
+  const values = useObservable(settings);
+  const [collapsed, setCollapsed] = useState(false);
+  useAppearance(values);
 
-  // Appearance settings apply immediately; they are the only settings with live effect in the prototype.
   useEffect(() => {
-    const a = settings.appearance ?? {};
-    const root = document.documentElement;
-    root.dataset.theme = String(a.theme ?? 'dark');
-    root.dataset.accent = String(a.accent ?? 'cyan');
-    root.dataset.density = String(a.density ?? 'comfortable');
-    root.dataset.motion = a.reducedMotion ? 'reduced' : 'normal';
-    root.style.setProperty('--font-scale', String(Number(a.fontScale ?? 100) / 100));
-  }, [settings]);
-
-  if (route.name === 'overlay') return <OverlayScreen />;
+    document.title = `${route.name[0].toUpperCase()}${route.name.slice(1)} · EDITH (simulated prototype)`;
+  }, [route.name]);
 
   let screen;
   switch (route.name) {
@@ -43,11 +38,18 @@ export default function App() {
       screen = <RoutingScreen />;
       break;
     case 'settings':
-      screen = <SettingsScreen section={route.section} />;
+      screen = <SettingsScreen />;
       break;
-    case 'chat':
+    case 'overlay':
+      screen = <OverlayScreen />;
+      break;
     default:
-      screen = <PromptKitConversation />;
+      screen = <ConversationScreen />;
   }
-  return <PromptKitShell route={route.name}>{screen}</PromptKitShell>;
+
+  return (
+    <AppShell route={route.name} collapsed={collapsed} onToggleRail={() => setCollapsed((c) => !c)}>
+      {screen}
+    </AppShell>
+  );
 }

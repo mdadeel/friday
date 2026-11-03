@@ -123,3 +123,43 @@ test('voice never reports microphone open outside Listening', () => {
   s.voice.setEngine('gemini_live_cloud', false);
   assert.equal(s.voice.get().engine, 'whisper_local', 'cloud engine refused without consent');
 });
+
+test('no seeded activity: routing counts start at zero and no model is called', () => {
+  const s = createMockServices();
+  const r = s.routing.get();
+  assert.equal(r.sessionRequests, 0);
+  assert.equal(r.modelCalls, 0);
+  assert.equal(r.recent.length, 0);
+  assert.equal(r.events.length, 0);
+});
+
+test('probing a provider reports unknown with a reason and never reports up', () => {
+  const s = createMockServices();
+  s.routing.probe('ollama');
+  const p = s.routing.get().providers.find((x) => x.id === 'ollama')!;
+  assert.equal(p.health, 'unknown');
+  assert.match(p.reason, /no provider client/i);
+  assert.ok(p.lastProbe);
+});
+
+test('enabling an MCP server never reports it ready: it is not started', () => {
+  const s = createMockServices();
+  s.capabilities.setServerEnabled('project-files', true);
+  const srv = s.capabilities.get().servers.find((x) => x.id === 'project-files')!;
+  assert.notEqual(srv.state, 'ready');
+  assert.equal(srv.state, 'unavailable');
+  assert.match(srv.reason ?? '', /not started/i);
+});
+
+test('a research task records orchestration and the evidence it cites', (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+  const s = createMockServices();
+  s.conversation.send('research the best architecture for an MCP host');
+  const task = s.tasks.get()[0];
+  assert.equal(task.orchestration.pattern, 'dag');
+  assert.equal(task.orchestration.maxParallel, 3);
+  runUntil(t, () => s.tasks.get()[0].outcome !== undefined);
+  const done = s.tasks.get()[0];
+  assert.ok(done.evidence.length > 0);
+  for (const e of done.evidence) assert.ok(e.checkedOn, 'every source has a check date');
+});
